@@ -60,7 +60,3 @@ CampusCupidSwing/
 Pull requests and issues are welcome! Feel free to fork and improve the project.
 
 ---
-
-## 📜 License
-
-This project is open source and available under the [MIT License](LICENSE).
