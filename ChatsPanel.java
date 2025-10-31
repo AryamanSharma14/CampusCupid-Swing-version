@@ -1,6 +1,8 @@
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.List;
+import java.util.Map;
 
 public class ChatsPanel extends JPanel {
     public ChatsPanel(MainWindow mainWindow) {
@@ -15,13 +17,7 @@ public class ChatsPanel extends JPanel {
         titleLabel.setBorder(BorderFactory.createEmptyBorder(20,0,10,0));
 
     DefaultListModel<String> chatListModel = new DefaultListModel<>();
-    chatListModel.addElement("Alex Sharma");
-    chatListModel.addElement("Priya Singh");
-    chatListModel.addElement("Rahul Verma");
-    chatListModel.addElement("Sneha Rao");
-    chatListModel.addElement("Arjun Patel");
-    chatListModel.addElement("Meera Joshi");
-    chatListModel.addElement("Vikram Singh");
+    DefaultListModel<Integer> chatIdModel = new DefaultListModel<>();
     JList<String> chatList = new JList<>(chatListModel);
     chatList.setFont(new Font("Arial", Font.PLAIN, 16));
     chatList.setBackground(Color.WHITE);
@@ -34,7 +30,7 @@ public class ChatsPanel extends JPanel {
         conversationPanel.setBackground(lightPurple);
         conversationPanel.setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
 
-        JTextPane conversationArea = new JTextPane();
+    JTextPane conversationArea = new JTextPane();
         conversationArea.setEditable(false);
         conversationArea.setFont(new Font("Segoe UI", Font.PLAIN, 16));
         conversationArea.setBackground(Color.WHITE);
@@ -45,7 +41,6 @@ public class ChatsPanel extends JPanel {
         javax.swing.text.StyleContext sc = new javax.swing.text.StyleContext();
         javax.swing.text.Style userStyle = sc.addStyle("user", null);
         javax.swing.text.Style otherStyle = sc.addStyle("other", null);
-        javax.swing.text.Style boldStyle = sc.addStyle("bold", null);
         javax.swing.text.Style timeStyle = sc.addStyle("time", null);
         javax.swing.text.StyleConstants.setFontFamily(userStyle, "Segoe UI");
         javax.swing.text.StyleConstants.setFontSize(userStyle, 16);
@@ -60,21 +55,18 @@ public class ChatsPanel extends JPanel {
         javax.swing.text.StyleConstants.setForeground(timeStyle, new Color(150,150,150));
 
         
-        Runnable setAlexChat = () -> {
-            conversationArea.setText("");
-            javax.swing.text.StyledDocument doc = conversationArea.getStyledDocument();
-            try {
-                doc.insertString(doc.getLength(), "Alex Sharma: ", otherStyle);
-                doc.insertString(doc.getLength(), "Hey!\n", null);
-                doc.insertString(doc.getLength(), "You: ", userStyle);
-                doc.insertString(doc.getLength(), "Hi Alex!\n", null);
-                doc.insertString(doc.getLength(), "Alex Sharma: ", otherStyle);
-                doc.insertString(doc.getLength(), "How's campus life?\n", null);
-                doc.insertString(doc.getLength(), "You: ", userStyle);
-                doc.insertString(doc.getLength(), "Pretty good, how about you?", null);
-            } catch (Exception ex) {}
+        Runnable loadMatches = () -> {
+            chatListModel.clear();
+            chatIdModel.clear();
+            Integer uid = mainWindow.getLoggedInUserId();
+            if (uid == null) return;
+            List<Map<String,Object>> rows = Database.getMatches(uid);
+            for (Map<String,Object> r : rows) {
+                chatIdModel.addElement((Integer) r.get("id"));
+                chatListModel.addElement((String) r.get("name"));
+            }
         };
-        setAlexChat.run();
+        loadMatches.run();
 
         JTextField messageField = new JTextField(20);
         messageField.setFont(new Font("Arial", Font.PLAIN, 15));
@@ -104,66 +96,19 @@ public class ChatsPanel extends JPanel {
 
         chatList.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
-                String selected = chatList.getSelectedValue();
+                int idx = chatList.getSelectedIndex();
+                if (idx < 0) return;
+                Integer otherId = chatIdModel.get(idx);
                 javax.swing.text.StyledDocument doc = conversationArea.getStyledDocument();
                 conversationArea.setText("");
                 try {
-                    if (selected.equals("Alex Sharma")) {
-                        setAlexChat.run();
-                    } else if (selected.equals("Priya Singh")) {
-                        doc.insertString(doc.getLength(), "Priya Singh: ", otherStyle);
-                        doc.insertString(doc.getLength(), "Hello!\n", null);
-                        doc.insertString(doc.getLength(), "You: ", userStyle);
-                        doc.insertString(doc.getLength(), "Hi Priya!\n", null);
-                        doc.insertString(doc.getLength(), "Priya Singh: ", otherStyle);
-                        doc.insertString(doc.getLength(), "Are you going to the music fest?\n", null);
-                        doc.insertString(doc.getLength(), "You: ", userStyle);
-                        doc.insertString(doc.getLength(), "Yes, see you there!", null);
-                    } else if (selected.equals("Rahul Verma")) {
-                        doc.insertString(doc.getLength(), "Rahul Verma: ", otherStyle);
-                        doc.insertString(doc.getLength(), "Hi!\n", null);
-                        doc.insertString(doc.getLength(), "You: ", userStyle);
-                        doc.insertString(doc.getLength(), "Hey Rahul!\n", null);
-                        doc.insertString(doc.getLength(), "Rahul Verma: ", otherStyle);
-                        doc.insertString(doc.getLength(), "Up for a cricket match?\n", null);
-                        doc.insertString(doc.getLength(), "You: ", userStyle);
-                        doc.insertString(doc.getLength(), "Always!", null);
-                    } else if (selected.equals("Sneha Rao")) {
-                        doc.insertString(doc.getLength(), "Sneha Rao: ", otherStyle);
-                        doc.insertString(doc.getLength(), "Hi!\n", null);
-                        doc.insertString(doc.getLength(), "You: ", userStyle);
-                        doc.insertString(doc.getLength(), "Hello Sneha!\n", null);
-                        doc.insertString(doc.getLength(), "Sneha Rao: ", otherStyle);
-                        doc.insertString(doc.getLength(), "Are you joining the coding club?\n", null);
-                        doc.insertString(doc.getLength(), "You: ", userStyle);
-                        doc.insertString(doc.getLength(), "Yes, excited!", null);
-                    } else if (selected.equals("Arjun Patel")) {
-                        doc.insertString(doc.getLength(), "Arjun Patel: ", otherStyle);
-                        doc.insertString(doc.getLength(), "Good morning!\n", null);
-                        doc.insertString(doc.getLength(), "You: ", userStyle);
-                        doc.insertString(doc.getLength(), "Morning Arjun!\n", null);
-                        doc.insertString(doc.getLength(), "Arjun Patel: ", otherStyle);
-                        doc.insertString(doc.getLength(), "Ready for the hackathon?\n", null);
-                        doc.insertString(doc.getLength(), "You: ", userStyle);
-                        doc.insertString(doc.getLength(), "Absolutely!", null);
-                    } else if (selected.equals("Meera Joshi")) {
-                        doc.insertString(doc.getLength(), "Meera Joshi: ", otherStyle);
-                        doc.insertString(doc.getLength(), "Hey!\n", null);
-                        doc.insertString(doc.getLength(), "You: ", userStyle);
-                        doc.insertString(doc.getLength(), "Hi Meera!\n", null);
-                        doc.insertString(doc.getLength(), "Meera Joshi: ", otherStyle);
-                        doc.insertString(doc.getLength(), "Want to study together?\n", null);
-                        doc.insertString(doc.getLength(), "You: ", userStyle);
-                        doc.insertString(doc.getLength(), "Sure, let's plan!", null);
-                    } else if (selected.equals("Vikram Singh")) {
-                        doc.insertString(doc.getLength(), "Vikram Singh: ", otherStyle);
-                        doc.insertString(doc.getLength(), "Hi!\n", null);
-                        doc.insertString(doc.getLength(), "You: ", userStyle);
-                        doc.insertString(doc.getLength(), "Hey Vikram!\n", null);
-                        doc.insertString(doc.getLength(), "Vikram Singh: ", otherStyle);
-                        doc.insertString(doc.getLength(), "Movie night this weekend?\n", null);
-                        doc.insertString(doc.getLength(), "You: ", userStyle);
-                        doc.insertString(doc.getLength(), "I'm in!", null);
+                    Integer uid = mainWindow.getLoggedInUserId();
+                    if (uid == null) return;
+                    List<Map<String,Object>> msgs = Database.getMessagesBetween(uid, otherId);
+                    for (Map<String,Object> m : msgs) {
+                        boolean fromOther = ((Integer)m.get("from")).intValue() == otherId;
+                        doc.insertString(doc.getLength(), fromOther ? (chatListModel.get(idx)+": ") : "You: ", fromOther ? otherStyle : userStyle);
+                        doc.insertString(doc.getLength(), (String)m.get("body") + "\n", null);
                     }
                 } catch (Exception ex) {}
             }
@@ -173,9 +118,15 @@ public class ChatsPanel extends JPanel {
             String msg = messageField.getText().trim();
             if (!msg.isEmpty()) {
                 try {
-                    javax.swing.text.StyledDocument doc = conversationArea.getStyledDocument();
-                    doc.insertString(doc.getLength(), "\nYou: ", userStyle);
-                    doc.insertString(doc.getLength(), msg, null);
+                    int idx = chatList.getSelectedIndex();
+                    if (idx >= 0) {
+                        Integer otherId = chatIdModel.get(idx);
+                        Integer uid = mainWindow.getLoggedInUserId();
+                        if (uid != null) Database.sendMessage(uid, otherId, msg);
+                        javax.swing.text.StyledDocument doc = conversationArea.getStyledDocument();
+                        doc.insertString(doc.getLength(), "You: ", userStyle);
+                        doc.insertString(doc.getLength(), msg + "\n", null);
+                    }
                 } catch (Exception ex) {}
                 messageField.setText("");
             }
@@ -191,6 +142,13 @@ public class ChatsPanel extends JPanel {
 
         backToSwipeButton.addActionListener(e -> {
             mainWindow.showScreen("swipe");
+        });
+
+        // Refresh matches when panel gains focus
+        this.addHierarchyListener(ev -> {
+            if ((ev.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && this.isShowing()) {
+                loadMatches.run();
+            }
         });
     }
 }

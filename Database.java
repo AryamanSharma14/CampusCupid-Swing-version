@@ -28,14 +28,36 @@ public class Database {
                     "  created_at INTEGER NOT NULL\n" +
                     ")");
 
-            st.execute("CREATE TABLE IF NOT EXISTS profiles (\n" +
-                    "  user_id INTEGER PRIMARY KEY,\n" +
-                    "  bio TEXT,\n" +
-                    "  interests TEXT,\n" +
-                    "  hobbies TEXT,\n" +
-                    "  occupation TEXT,\n" +
-                    "  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE\n" +
-                    ")");
+        st.execute("CREATE TABLE IF NOT EXISTS profiles (\n" +
+            "  user_id INTEGER PRIMARY KEY,\n" +
+            "  name TEXT,\n" +
+            "  gender TEXT,\n" +
+            "  age INTEGER,\n" +
+            "  bio TEXT,\n" +
+            "  interests TEXT,\n" +
+            "  hobbies TEXT,\n" +
+            "  occupation TEXT,\n" +
+            "  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE\n" +
+            ")");
+
+            // Migration for older DBs missing columns
+            try (PreparedStatement ps = conn.prepareStatement("PRAGMA table_info(profiles)")) {
+                java.util.Set<String> cols = new java.util.HashSet<>();
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        cols.add(rs.getString("name").toLowerCase());
+                    }
+                }
+                if (!cols.contains("name")) {
+                    st.execute("ALTER TABLE profiles ADD COLUMN name TEXT");
+                }
+                if (!cols.contains("gender")) {
+                    st.execute("ALTER TABLE profiles ADD COLUMN gender TEXT");
+                }
+                if (!cols.contains("age")) {
+                    st.execute("ALTER TABLE profiles ADD COLUMN age INTEGER");
+                }
+            } catch (SQLException ignore) {}
 
             st.execute("CREATE TABLE IF NOT EXISTS preferences (\n" +
                     "  user_id INTEGER PRIMARY KEY,\n" +
@@ -121,10 +143,10 @@ public class Database {
         return null;
     }
 
-    public static void upsertProfile(int userId, String name, String bio, String interests, String hobbies, String occupation) {
+    public static void upsertProfile(int userId, String name, String gender, Integer age, String bio, String interests, String hobbies, String occupation) {
         String sqlUser = "UPDATE users SET name=? WHERE id=?";
-        String sql = "INSERT INTO profiles(user_id, bio, interests, hobbies, occupation) VALUES(?,?,?,?,?)\n" +
-                "ON CONFLICT(user_id) DO UPDATE SET bio=excluded.bio, interests=excluded.interests, hobbies=excluded.hobbies, occupation=excluded.occupation";
+        String sql = "INSERT INTO profiles(user_id, name, gender, age, bio, interests, hobbies, occupation) VALUES(?,?,?,?,?,?,?,?)\n" +
+                "ON CONFLICT(user_id) DO UPDATE SET name=excluded.name, gender=excluded.gender, age=excluded.age, bio=excluded.bio, interests=excluded.interests, hobbies=excluded.hobbies, occupation=excluded.occupation";
         try (Connection conn = getConnection()) {
             conn.setAutoCommit(false);
             try (PreparedStatement upUser = conn.prepareStatement(sqlUser); PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -133,10 +155,13 @@ public class Database {
                 upUser.executeUpdate();
 
                 ps.setInt(1, userId);
-                ps.setString(2, bio);
-                ps.setString(3, interests);
-                ps.setString(4, hobbies);
-                ps.setString(5, occupation);
+                ps.setString(2, name);
+                ps.setString(3, gender);
+                if (age == null) ps.setNull(4, Types.INTEGER); else ps.setInt(4, age);
+                ps.setString(5, bio);
+                ps.setString(6, interests);
+                ps.setString(7, hobbies);
+                ps.setString(8, occupation);
                 ps.executeUpdate();
                 conn.commit();
             } catch (SQLException e) {
@@ -148,6 +173,145 @@ public class Database {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+    }
+
+    public static ResultSet listCandidatesRaw(Connection conn, int userId, String genderPref, Integer agePref, String interestsPref) throws SQLException {
+        StringBuilder sb = new StringBuilder();
+        sb.append("SELECT u.id, COALESCE(p.name,u.name) AS name, p.gender, p.age, p.interests, p.bio " +
+                  "FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id<>? ");
+        if (genderPref != null && !"Any".equalsIgnoreCase(genderPref)) {
+            sb.append(" AND LOWER(p.gender)=LOWER(?)");
+        }
+        // Fetch; we'll filter age/interests in code for simplicity
+        PreparedStatement ps = conn.prepareStatement(sb.toString());
+        int idx = 1;
+        ps.setInt(idx++, userId);
+        if (genderPref != null && !"Any".equalsIgnoreCase(genderPref)) {
+            ps.setString(idx++, genderPref);
+        }
+        return ps.executeQuery();
+    }
+
+    public static java.util.List<Map<String, Object>> listCandidates(int userId, String genderPref, int agePref, String interestsPref) {
+        java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
+        try (Connection conn = getConnection(); ResultSet rs = listCandidatesRaw(conn, userId, genderPref, agePref, interestsPref == null ? "" : interestsPref.toLowerCase())) {
+            while (rs.next()) {
+                Integer age = (Integer) rs.getObject("age");
+                String interests = rs.getString("interests");
+                boolean ageMatch = (age == null) || Math.abs(age - agePref) <= 2;
+                boolean interestsMatch = (interestsPref == null || interestsPref.isEmpty()) || (interests != null && interests.toLowerCase().contains(interestsPref));
+                if (ageMatch && interestsMatch) {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("id", rs.getInt("id"));
+                    m.put("name", rs.getString("name"));
+                    m.put("gender", rs.getString("gender"));
+                    m.put("age", age);
+                    m.put("interests", interests);
+                    m.put("bio", rs.getString("bio"));
+                    out.add(m);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return out;
+    }
+
+    public static boolean recordSwipe(int userId, int targetUserId, boolean liked) {
+        String insert = "INSERT INTO swipes(user_id, target_user_id, liked, created_at) VALUES(?,?,?,?)";
+        try (Connection conn = getConnection()) {
+            conn.setAutoCommit(false);
+            try (PreparedStatement ps = conn.prepareStatement(insert)) {
+                ps.setInt(1, userId);
+                ps.setInt(2, targetUserId);
+                ps.setInt(3, liked ? 1 : 0);
+                ps.setLong(4, Instant.now().getEpochSecond());
+                ps.executeUpdate();
+            }
+            boolean matched = false;
+            if (liked) {
+                // Check reciprocal like
+                String check = "SELECT 1 FROM swipes WHERE user_id=? AND target_user_id=? AND liked=1";
+                try (PreparedStatement ps2 = conn.prepareStatement(check)) {
+                    ps2.setInt(1, targetUserId);
+                    ps2.setInt(2, userId);
+                    try (ResultSet rs = ps2.executeQuery()) {
+                        if (rs.next()) {
+                            int a = Math.min(userId, targetUserId);
+                            int b = Math.max(userId, targetUserId);
+                            String mk = "INSERT OR IGNORE INTO matches(user1_id, user2_id, created_at) VALUES(?,?,?)";
+                            try (PreparedStatement mkps = conn.prepareStatement(mk)) {
+                                mkps.setInt(1, a);
+                                mkps.setInt(2, b);
+                                mkps.setLong(3, Instant.now().getEpochSecond());
+                                mkps.executeUpdate();
+                                matched = true;
+                            }
+                        }
+                    }
+                }
+            }
+            conn.commit();
+            return matched;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public static java.util.List<Map<String, Object>> getMatches(int userId) {
+        java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
+        String sql = "SELECT CASE WHEN m.user1_id=? THEN m.user2_id ELSE m.user1_id END AS other_id, COALESCE(p.name,u.name) AS name " +
+                     "FROM matches m JOIN users u ON u.id=CASE WHEN m.user1_id=? THEN m.user2_id ELSE m.user1_id END " +
+                     "LEFT JOIN profiles p ON p.user_id=u.id WHERE m.user1_id=? OR m.user2_id=?";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setInt(2, userId);
+            ps.setInt(3, userId);
+            ps.setInt(4, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("id", rs.getInt("other_id"));
+                    m.put("name", rs.getString("name"));
+                    out.add(m);
+                }
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return out;
+    }
+
+    public static java.util.List<Map<String, Object>> getMessagesBetween(int a, int b) {
+        java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
+        String sql = "SELECT from_user_id, to_user_id, body, created_at FROM messages WHERE (from_user_id=? AND to_user_id=?) OR (from_user_id=? AND to_user_id=?) ORDER BY created_at ASC";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, a);
+            ps.setInt(2, b);
+            ps.setInt(3, b);
+            ps.setInt(4, a);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("from", rs.getInt("from_user_id"));
+                    m.put("to", rs.getInt("to_user_id"));
+                    m.put("body", rs.getString("body"));
+                    m.put("ts", rs.getLong("created_at"));
+                    out.add(m);
+                }
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return out;
+    }
+
+    public static void sendMessage(int from, int to, String body) {
+        String sql = "INSERT INTO messages(from_user_id, to_user_id, body, created_at) VALUES(?,?,?,?)";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, from);
+            ps.setInt(2, to);
+            ps.setString(3, body);
+            ps.setLong(4, Instant.now().getEpochSecond());
+            ps.executeUpdate();
+        } catch (SQLException e) { e.printStackTrace(); }
     }
 
     public static void upsertPreferences(int userId, String gender, int age, String interests) {

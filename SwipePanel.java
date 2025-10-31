@@ -3,12 +3,13 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 public class SwipePanel extends JPanel {
     
     private static final Color purple = new Color(128, 0, 128);
     private static final Color lightPurple = new Color(230, 210, 255);
-    private ArrayList<Candidate> allCandidates;
     private ArrayList<Candidate> candidates;
     private int currentIndex = 0;
     private JLabel nameLabel, imageLabel, bioLabel;
@@ -20,20 +21,7 @@ public class SwipePanel extends JPanel {
 
     setLayout(new BorderLayout(10,10));
 
-    
-    allCandidates = new ArrayList<>();
-    allCandidates.add(new Candidate("Alex", "Male", 21, "Music, Sports", "Outgoing and friendly.", "A"));
-    allCandidates.add(new Candidate("Priya", "Female", 20, "Art, Reading", "Creative and thoughtful.", "P"));
-    allCandidates.add(new Candidate("Sam", "Male", 22, "Tech, Gaming", "Loves coding and games.", "S"));
-    allCandidates.add(new Candidate("Riya", "Female", 19, "Travel, Food", "Adventurous foodie.", "R"));
-    allCandidates.add(new Candidate("Jordan", "Other", 23, "Movies, Writing", "Film buff and writer.", "J"));
-    allCandidates.add(new Candidate("Neha", "Female", 21, "Photography, Baking", "Loves capturing moments and baking treats.", "N"));
-    allCandidates.add(new Candidate("Aman", "Male", 22, "Football, Chess", "Strategic thinker and sports enthusiast.", "AM"));
-    allCandidates.add(new Candidate("Sara", "Female", 20, "Fashion, Blogging", "Trendy and expressive.", "SARA"));
-    allCandidates.add(new Candidate("Dev", "Male", 23, "Music, Coding", "Musician and coder.", "DEV"));
-    allCandidates.add(new Candidate("Ishaan", "Male", 21, "Travel, Reading", "Explorer and bookworm.", "ISH"));
-
-    filterCandidates(mainWindow);
+    loadCandidates(mainWindow);
 
         JPanel cardPanel = new JPanel();
         cardPanel.setLayout(new BoxLayout(cardPanel, BoxLayout.Y_AXIS));
@@ -68,12 +56,12 @@ public class SwipePanel extends JPanel {
         bioArea.setBackground(Color.WHITE);
         bioArea.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        likeButton = new JButton("Like");
+    likeButton = new JButton("Like ❤");
         likeButton.setBackground(purple);
         likeButton.setForeground(Color.WHITE);
         likeButton.setFont(new Font("Arial", Font.BOLD, 16));
         likeButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        passButton = new JButton("Pass");
+    passButton = new JButton("Pass ✕");
         passButton.setBackground(Color.WHITE);
         passButton.setForeground(purple);
         passButton.setFont(new Font("Arial", Font.BOLD, 16));
@@ -123,12 +111,20 @@ public class SwipePanel extends JPanel {
         updateCandidateCard();
 
         likeButton.addActionListener(e -> {
-            matchLabel.setText("You liked " + candidates.get(currentIndex).name + "!");
-            nextCandidate();
+            if (currentIndex < candidates.size()) {
+                Candidate c = candidates.get(currentIndex);
+                boolean matched = Database.recordSwipe(mainWindow.getLoggedInUserId(), c.userId, true);
+                matchLabel.setText(matched ? ("It's a match with " + c.name + "!") : ("You liked " + c.name + "!"));
+                nextCandidate();
+            }
         });
         passButton.addActionListener(e -> {
-            matchLabel.setText("You passed " + candidates.get(currentIndex).name + ".");
-            nextCandidate();
+            if (currentIndex < candidates.size()) {
+                Candidate c = candidates.get(currentIndex);
+                Database.recordSwipe(mainWindow.getLoggedInUserId(), c.userId, false);
+                matchLabel.setText("You passed " + c.name + ".");
+                nextCandidate();
+            }
         });
         backButton.addActionListener(e -> {
             mainWindow.showScreen("profile");
@@ -137,27 +133,31 @@ public class SwipePanel extends JPanel {
             mainWindow.showScreen("chats");
         });
         refreshButton.addActionListener(e -> {
-            
-            allCandidates.add(new Candidate("Taylor", "Female", 21, "Dance, Yoga", "Energetic and positive.", "T"));
-            allCandidates.add(new Candidate("Chris", "Male", 24, "Photography, Hiking", "Nature lover and photographer.", "C"));
-            filterCandidates(mainWindow);
+            loadCandidates(mainWindow);
             updateCandidateCard();
             matchLabel.setText("Candidates refreshed!");
         });
     }
 
-    private void filterCandidates(MainWindow mainWindow) {
+    private void loadCandidates(MainWindow mainWindow) {
+        candidates = new ArrayList<>();
+        Integer uid = mainWindow.getLoggedInUserId();
+        if (uid == null) return;
         String prefGender = mainWindow.getPrefGender();
         int prefAge = mainWindow.getPrefAge();
         String prefInterests = mainWindow.getPrefInterests();
-        candidates = new ArrayList<>();
-        for (Candidate c : allCandidates) {
-            boolean genderMatch = prefGender.equals("Any") || c.gender.equalsIgnoreCase(prefGender);
-            boolean ageMatch = Math.abs(c.age - prefAge) <= 2;
-            boolean interestsMatch = prefInterests.isEmpty() || c.interests.toLowerCase().contains(prefInterests);
-            if (genderMatch && ageMatch && interestsMatch) {
-                candidates.add(c);
-            }
+        List<Map<String,Object>> rows = Database.listCandidates(uid, prefGender, prefAge, prefInterests);
+        for (Map<String,Object> r : rows) {
+            Integer age = (Integer) r.get("age");
+            candidates.add(new Candidate(
+                (Integer) r.get("id"),
+                (String) r.get("name"),
+                (String) r.get("gender"),
+                age == null ? 0 : age,
+                (String) r.get("interests"),
+                (String) r.get("bio"),
+                "🧑"
+            ));
         }
         currentIndex = 0;
     }
@@ -188,9 +188,11 @@ public class SwipePanel extends JPanel {
 
     // Detailed candidate data class
     static class Candidate {
+        int userId;
         String name, gender, interests, bio, image;
         int age;
-        Candidate(String name, String gender, int age, String interests, String bio, String image) {
+        Candidate(int userId, String name, String gender, int age, String interests, String bio, String image) {
+            this.userId = userId;
             this.name = name;
             this.gender = gender;
             this.age = age;

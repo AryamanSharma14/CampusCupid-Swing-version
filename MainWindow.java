@@ -96,9 +96,17 @@ public class MainWindow extends JFrame {
     }
 
     // Registration logic
-    public boolean registerUser(String email, String password) {
+    public boolean registerUser(String email, String password, String name) {
         // Use database-backed registration
-        return Database.registerUser(email, password);
+        boolean ok = Database.registerUser(email, password);
+        if (ok) {
+            Integer uid = Database.getUserIdByEmail(email);
+            if (uid != null) {
+                // Seed profile with name so candidates show display name even before profile save
+                Database.upsertProfile(uid, name, null, null, "", "", "", "");
+            }
+        }
+        return ok;
     }
 
     // Login logic

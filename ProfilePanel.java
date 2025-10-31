@@ -30,13 +30,29 @@ public class ProfilePanel extends JPanel {
         titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         titleLabel.setForeground(purple);
 
-        JLabel nameLabel = new JLabel("Full Name:");
+    JLabel nameLabel = new JLabel("Full Name:");
         nameLabel.setFont(new Font("Arial", Font.PLAIN, 16));
         nameLabel.setForeground(purple);
         nameLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         JTextField nameField = new JTextField(20);
         nameField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
         nameField.setHorizontalAlignment(JTextField.CENTER);
+
+    JLabel genderLabel = new JLabel("Your Gender:");
+    genderLabel.setFont(new Font("Arial", Font.PLAIN, 16));
+    genderLabel.setForeground(purple);
+    genderLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+    String[] genders = {"Male", "Female", "Other"};
+    JComboBox<String> genderCombo = new JComboBox<>(genders);
+    genderCombo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+    genderCombo.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+    JLabel ageLabel = new JLabel("Your Age:");
+    ageLabel.setFont(new Font("Arial", Font.PLAIN, 16));
+    ageLabel.setForeground(purple);
+    ageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+    JSpinner ageSpinner = new JSpinner(new SpinnerNumberModel(21, 18, 60, 1));
+    ageSpinner.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 
     JLabel bioLabel = new JLabel("Bio:");
     bioLabel.setFont(new Font("Arial", Font.PLAIN, 16));
@@ -98,6 +114,12 @@ public class ProfilePanel extends JPanel {
         profileCard.add(nameLabel);
         profileCard.add(nameField);
         profileCard.add(Box.createVerticalStrut(10));
+    profileCard.add(genderLabel);
+    profileCard.add(genderCombo);
+    profileCard.add(Box.createVerticalStrut(10));
+    profileCard.add(ageLabel);
+    profileCard.add(ageSpinner);
+    profileCard.add(Box.createVerticalStrut(10));
     profileCard.add(bioLabel);
     profileCard.add(bioArea);
     profileCard.add(Box.createVerticalStrut(10));
@@ -129,7 +151,8 @@ public class ProfilePanel extends JPanel {
                 // Persist to database
                 Integer uid = mainWindow.getLoggedInUserId();
                 if (uid != null) {
-                    Database.upsertProfile(uid, name, bio, interestsField.getText().trim(), hobbiesField.getText().trim(), occupationField.getText().trim());
+                    Integer age = (Integer) ageSpinner.getValue();
+                    Database.upsertProfile(uid, name, (String)genderCombo.getSelectedItem(), age, bio, interestsField.getText().trim(), hobbiesField.getText().trim(), occupationField.getText().trim());
                 }
                 messageLabel.setText("Profile saved! Go to Preferences");
                 messageLabel.setForeground(new Color(0, 153, 51));
