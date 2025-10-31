@@ -19,15 +19,16 @@
 ## 🖥️ How to Run
 
 1. **Install Java** (JDK 8 or higher)
-2. **Compile all Java files**
-   ```sh
-   javac *.java
+2. SQLite JDBC is included under `lib/sqlite-jdbc.jar` (downloaded automatically).
+3. **Compile all Java files** (Windows PowerShell):
+   ```powershell
+   javac -cp ".;lib/sqlite-jdbc.jar;lib/slf4j-api.jar;lib/slf4j-simple.jar" *.java
    ```
-3. **Run the application**
-   ```sh
-   java MainWindow
+4. **Run the application** (Windows PowerShell):
+   ```powershell
+   java -cp ".;lib/sqlite-jdbc.jar;lib/slf4j-api.jar;lib/slf4j-simple.jar" MainWindow
    ```
-   _Replace `MainWindow` with your main class if different._
+   The app will create a local SQLite file `campuscupid.db` in the project folder.
 
 ---
 
@@ -55,7 +56,22 @@ CampusCupidSwing/
 
 ---
 
-## 💡 Contributing
+## �️ Database
+
+SQLite database `campuscupid.db` is created automatically with tables:
+
+- `users(id, email, password_hash, name, created_at)`
+- `profiles(user_id, bio, interests, hobbies, occupation)`
+- `preferences(user_id, gender_pref, age_pref, interests_pref)`
+- `swipes(id, user_id, target_user_id, liked, created_at)`
+- `matches(id, user1_id, user2_id, created_at)`
+- `messages(id, from_user_id, to_user_id, body, created_at)`
+
+Passwords are hashed using SHA-256 with an app salt for demo purposes. For production use, replace with bcrypt/Argon2.
+
+---
+
+## �💡 Contributing
 
 Pull requests and issues are welcome! Feel free to fork and improve the project.
 

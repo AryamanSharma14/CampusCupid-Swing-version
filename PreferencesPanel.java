@@ -22,7 +22,7 @@ public class PreferencesPanel extends JPanel {
         genderLabel.setFont(new Font("Arial", Font.PLAIN, 16));
         genderLabel.setForeground(purple);
         genderLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        String[] genders = {"Any", "Male", "Female", "Other"};
+    String[] genders = {"Any", "Male", "Female", "Other"};
         JComboBox<String> genderCombo = new JComboBox<>(genders);
         genderCombo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
         genderCombo.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -31,7 +31,12 @@ public class PreferencesPanel extends JPanel {
         ageLabel.setFont(new Font("Arial", Font.PLAIN, 16));
         ageLabel.setForeground(purple);
         ageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        JSlider ageSlider = new JSlider(30, 50, 34);
+    // Load saved preferences
+    String savedGender = mainWindow.getPrefGender();
+    int savedAge = mainWindow.getPrefAge();
+    String savedInterests = mainWindow.getPrefInterests();
+
+    JSlider ageSlider = new JSlider(30, 50, Math.max(30, Math.min(50, savedAge)));
         ageSlider.setMajorTickSpacing(2);
         ageSlider.setPaintTicks(true);
         ageSlider.setPaintLabels(true);
@@ -46,6 +51,12 @@ public class PreferencesPanel extends JPanel {
         interestsField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
         interestsField.setAlignmentX(Component.CENTER_ALIGNMENT);
         interestsField.setHorizontalAlignment(JTextField.CENTER);
+
+        // Set initial control values from saved prefs
+        if (savedGender != null) {
+            genderCombo.setSelectedItem(savedGender);
+        }
+        interestsField.setText(savedInterests != null ? savedInterests : "");
 
         JButton saveButton = new JButton("Save Preferences");
         saveButton.setBackground(Color.GREEN);

@@ -1,17 +1,21 @@
 import javax.swing.*;
 import java.awt.*;
-import java.util.HashMap;
+import java.util.Map;
 
 public class MainWindow extends JFrame {
     // Store user preferences
     private String prefGender = "Any";
     private int prefAge = 24;
     private String prefInterests = "";
+    private Integer loggedInUserId = null;
 
     public void setUserPreferences(String gender, int age, String interests) {
         this.prefGender = gender;
         this.prefAge = age;
         this.prefInterests = interests;
+        if (loggedInUserId != null) {
+            Database.upsertPreferences(loggedInUserId, gender, age, interests);
+        }
     }
 
     public String getPrefGender() { return prefGender; }
@@ -19,8 +23,6 @@ public class MainWindow extends JFrame {
     public String getPrefInterests() { return prefInterests; }
     private CardLayout cardLayout;
     private JPanel mainPanel;
-    // Store registered users: email -> password
-    private HashMap<String, String> users = new HashMap<>();
     // Store logged-in user
     private String loggedInEmail = null;
     // Track if profile is completed
@@ -31,6 +33,19 @@ public class MainWindow extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(500, 600);
         setLocationRelativeTo(null);
+
+        // Improve Look & Feel (Nimbus) if available
+        try {
+            for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
+                if ("Nimbus".equals(info.getName())) {
+                    UIManager.setLookAndFeel(info.getClassName());
+                    break;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        // Initialize database schema
+        Database.init();
 
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
@@ -82,15 +97,21 @@ public class MainWindow extends JFrame {
 
     // Registration logic
     public boolean registerUser(String email, String password) {
-        if (users.containsKey(email)) return false;
-        users.put(email, password);
-        return true;
+        // Use database-backed registration
+        return Database.registerUser(email, password);
     }
 
     // Login logic
     public boolean loginUser(String email, String password) {
-        if (users.containsKey(email) && users.get(email).equals(password)) {
+        Integer uid = Database.loginUser(email, password);
+        if (uid != null) {
             loggedInEmail = email;
+            loggedInUserId = uid;
+            // Load saved preferences for this user, if any
+            Map<String, Object> p = Database.getPreferences(uid);
+            if (p.get("gender") != null) this.prefGender = (String) p.get("gender");
+            if (p.get("age") != null) this.prefAge = (Integer) p.get("age");
+            if (p.get("interests") != null) this.prefInterests = (String) p.get("interests");
             return true;
         }
         return false;
@@ -100,8 +121,13 @@ public class MainWindow extends JFrame {
         return loggedInEmail;
     }
 
+    public Integer getLoggedInUserId() {
+        return loggedInUserId;
+    }
+
     public void logout() {
         loggedInEmail = null;
+        loggedInUserId = null;
         profileCompleted = false;
         showScreen("login");
     }

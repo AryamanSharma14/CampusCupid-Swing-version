@@ -126,6 +126,11 @@ public class ProfilePanel extends JPanel {
                 messageLabel.setText("Name and Bio cannot be empty");
                 messageLabel.setForeground(Color.RED);
             } else {
+                // Persist to database
+                Integer uid = mainWindow.getLoggedInUserId();
+                if (uid != null) {
+                    Database.upsertProfile(uid, name, bio, interestsField.getText().trim(), hobbiesField.getText().trim(), occupationField.getText().trim());
+                }
                 messageLabel.setText("Profile saved! Go to Preferences");
                 messageLabel.setForeground(new Color(0, 153, 51));
                 mainWindow.setProfileCompleted(true);
