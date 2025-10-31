@@ -32,6 +32,28 @@
 
 ---
 
+## 🌐 Multi‑laptop demo (super simple)
+
+This repo includes a tiny HTTP server so multiple laptops can register, swipe, match, and chat together.
+
+1) On ONE laptop (the "host"), start the server:
+   ```powershell
+   java -cp ".;lib/sqlite-jdbc.jar;lib/slf4j-api.jar;lib/slf4j-simple.jar" ServerMain
+   ```
+   - It runs on port 8080 and uses the same `campuscupid.db` file.
+
+2) On EVERY laptop (including the host), start the app and enter the server URL when prompted:
+   - Example on host: `http://localhost:8080`
+   - Example on other laptops (replace with host IP): `http://192.168.1.23:8080`
+
+3) Present: register different accounts, set profiles/preferences, swipe to match, and chat. All data is shared via the server.
+
+Notes
+- This is for demo/classroom use. It skips complex auth, uses simple endpoints and local DB.
+- For production, switch to a deployed server and a cloud DB (Postgres/MySQL) and add proper auth (tokens/HTTPS).
+
+---
+
 ## 📁 Project Structure
 
 ```

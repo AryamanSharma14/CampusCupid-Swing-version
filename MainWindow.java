@@ -44,7 +44,12 @@ public class MainWindow extends JFrame {
             }
         } catch (Exception ignored) {}
 
-        // Initialize database schema
+        // Ask for optional server URL for multi-laptop demo
+        String url = JOptionPane.showInputDialog(this, "Server URL (leave blank for local DB):", "http://localhost:8080");
+        if (url != null && !url.trim().isEmpty()) {
+            Database.setRemoteBaseUrl(url.trim());
+        }
+        // Initialize database schema (used by local mode and also safe on server)
         Database.init();
 
         cardLayout = new CardLayout();

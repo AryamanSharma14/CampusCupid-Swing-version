@@ -1,0 +1,20 @@
+# Build outputs
+*.class
+*.jar
+*.war
+*.ear
+
+# Local databases and logs
+*.db
+*.sqlite
+*.log
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+
+# Java crash logs
+hs_err_pid*

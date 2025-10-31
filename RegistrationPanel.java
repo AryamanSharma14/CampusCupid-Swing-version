@@ -1,7 +1,6 @@
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
 
 public class RegistrationPanel extends JPanel {
     public RegistrationPanel(MainWindow mainWindow) {
@@ -92,13 +91,17 @@ public class RegistrationPanel extends JPanel {
         registerButton.addActionListener(e -> {
             String email = emailField.getText().trim();
             String password = new String(passwordField.getPassword()).trim();
+            String fullName = nameField.getText().trim();
             if (!email.endsWith("@srmist.edu.in")) {
                 messageLabel.setText("Email must end with @srmist.edu.in");
                 messageLabel.setForeground(Color.RED);
             } else if (password.isEmpty()) {
                 messageLabel.setText("Password cannot be empty");
                 messageLabel.setForeground(Color.RED);
-            } else if (!mainWindow.registerUser(email, password)) {
+            } else if (fullName.isEmpty()) {
+                messageLabel.setText("Full Name cannot be empty");
+                messageLabel.setForeground(Color.RED);
+            } else if (!mainWindow.registerUser(email, password, fullName)) {
                 messageLabel.setText("Email already registered");
                 messageLabel.setForeground(Color.RED);
             } else {

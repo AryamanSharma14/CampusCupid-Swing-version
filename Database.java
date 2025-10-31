@@ -7,6 +7,7 @@ import java.security.MessageDigest;
 public class Database {
     private static final String DB_URL = "jdbc:sqlite:campuscupid.db";
     private static final String PASS_SALT = "CampusCupidSalt_v1"; // Note: for demo only; use per-user salts + bcrypt/argon2 in production
+    private static String REMOTE_BASE_URL = null; // When set, use HTTP instead of local DB
 
     public static Connection getConnection() throws SQLException {
         return DriverManager.getConnection(DB_URL);
@@ -101,7 +102,23 @@ public class Database {
         }
     }
 
+    // Remote mode configuration (set once at app start)
+    public static void setRemoteBaseUrl(String baseUrl) {
+        REMOTE_BASE_URL = (baseUrl == null || baseUrl.isEmpty()) ? null : baseUrl.replaceAll("/$", "");
+        System.out.println("Remote mode: " + (REMOTE_BASE_URL == null ? "OFF (local SQLite)" : ("ON -> " + REMOTE_BASE_URL)));
+    }
+
     public static boolean registerUser(String email, String password) {
+        if (REMOTE_BASE_URL != null) {
+            try {
+                String resp = httpPostForm(REMOTE_BASE_URL + "/api/register", mapOf(
+                        "email", email,
+                        "password", password,
+                        "name", email
+                ));
+                return resp.trim().equals("OK");
+            } catch (Exception e) { return false; }
+        }
         String sql = "INSERT INTO users(email, password_hash, created_at) VALUES(?,?,?)";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, email);
@@ -115,6 +132,16 @@ public class Database {
     }
 
     public static Integer loginUser(String email, String password) {
+        if (REMOTE_BASE_URL != null) {
+            try {
+                String resp = httpPostForm(REMOTE_BASE_URL + "/api/login", mapOf(
+                        "email", email,
+                        "password", password
+                ));
+                if (resp != null && resp.matches("\\d+")) return Integer.parseInt(resp.trim());
+            } catch (Exception e) { }
+            return null;
+        }
         String sql = "SELECT id, password_hash FROM users WHERE email=?";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, email);
@@ -144,6 +171,21 @@ public class Database {
     }
 
     public static void upsertProfile(int userId, String name, String gender, Integer age, String bio, String interests, String hobbies, String occupation) {
+        if (REMOTE_BASE_URL != null) {
+            try {
+                httpPostForm(REMOTE_BASE_URL + "/api/profile", mapOf(
+                        "userId", String.valueOf(userId),
+                        "name", orEmpty(name),
+                        "gender", orEmpty(gender),
+                        "age", age == null ? "" : String.valueOf(age),
+                        "bio", orEmpty(bio),
+                        "interests", orEmpty(interests),
+                        "hobbies", orEmpty(hobbies),
+                        "occupation", orEmpty(occupation)
+                ));
+                return;
+            } catch (Exception e) { /* fall through */ }
+        }
         String sqlUser = "UPDATE users SET name=? WHERE id=?";
         String sql = "INSERT INTO profiles(user_id, name, gender, age, bio, interests, hobbies, occupation) VALUES(?,?,?,?,?,?,?,?)\n" +
                 "ON CONFLICT(user_id) DO UPDATE SET name=excluded.name, gender=excluded.gender, age=excluded.age, bio=excluded.bio, interests=excluded.interests, hobbies=excluded.hobbies, occupation=excluded.occupation";
@@ -193,6 +235,29 @@ public class Database {
     }
 
     public static java.util.List<Map<String, Object>> listCandidates(int userId, String genderPref, int agePref, String interestsPref) {
+        if (REMOTE_BASE_URL != null) {
+            java.util.List<Map<String,Object>> out = new java.util.ArrayList<>();
+            try {
+                String qs = String.format("?userId=%d&gender=%s&age=%d&interests=%s", userId, urlEncode(genderPref==null?"":genderPref), agePref, urlEncode(interestsPref==null?"":interestsPref));
+                String resp = httpGet(REMOTE_BASE_URL + "/api/candidates" + qs);
+                if (resp != null) {
+                    String[] lines = resp.split("\r?\n");
+                    for (String line : lines) {
+                        if (line.trim().isEmpty()) continue;
+                        String[] parts = line.split("\\|", -1);
+                        Map<String,Object> m = new java.util.HashMap<>();
+                        m.put("id", Integer.parseInt(parts[0]));
+                        m.put("name", parts[1]);
+                        m.put("gender", parts[2]);
+                        m.put("age", parts[3].isEmpty()? null : Integer.parseInt(parts[3]));
+                        m.put("interests", parts[4]);
+                        m.put("bio", parts[5]);
+                        out.add(m);
+                    }
+                }
+            } catch (Exception e) { }
+            return out;
+        }
         java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
         try (Connection conn = getConnection(); ResultSet rs = listCandidatesRaw(conn, userId, genderPref, agePref, interestsPref == null ? "" : interestsPref.toLowerCase())) {
             while (rs.next()) {
@@ -218,6 +283,16 @@ public class Database {
     }
 
     public static boolean recordSwipe(int userId, int targetUserId, boolean liked) {
+        if (REMOTE_BASE_URL != null) {
+            try {
+                String resp = httpPostForm(REMOTE_BASE_URL + "/api/swipe", mapOf(
+                        "userId", String.valueOf(userId),
+                        "targetUserId", String.valueOf(targetUserId),
+                        "liked", liked ? "1" : "0"
+                ));
+                return "MATCH".equals(resp.trim());
+            } catch (Exception e) { return false; }
+        }
         String insert = "INSERT INTO swipes(user_id, target_user_id, liked, created_at) VALUES(?,?,?,?)";
         try (Connection conn = getConnection()) {
             conn.setAutoCommit(false);
@@ -260,6 +335,24 @@ public class Database {
     }
 
     public static java.util.List<Map<String, Object>> getMatches(int userId) {
+        if (REMOTE_BASE_URL != null) {
+            java.util.List<Map<String,Object>> out = new java.util.ArrayList<>();
+            try {
+                String resp = httpGet(REMOTE_BASE_URL + "/api/matches?userId=" + userId);
+                if (resp != null) {
+                    String[] lines = resp.split("\r?\n");
+                    for (String line : lines) {
+                        if (line.trim().isEmpty()) continue;
+                        String[] parts = line.split("\\|", -1);
+                        Map<String,Object> m = new java.util.HashMap<>();
+                        m.put("id", Integer.parseInt(parts[0]));
+                        m.put("name", parts[1]);
+                        out.add(m);
+                    }
+                }
+            } catch (Exception e) { }
+            return out;
+        }
         java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
         String sql = "SELECT CASE WHEN m.user1_id=? THEN m.user2_id ELSE m.user1_id END AS other_id, COALESCE(p.name,u.name) AS name " +
                      "FROM matches m JOIN users u ON u.id=CASE WHEN m.user1_id=? THEN m.user2_id ELSE m.user1_id END " +
@@ -282,6 +375,26 @@ public class Database {
     }
 
     public static java.util.List<Map<String, Object>> getMessagesBetween(int a, int b) {
+        if (REMOTE_BASE_URL != null) {
+            java.util.List<Map<String,Object>> out = new java.util.ArrayList<>();
+            try {
+                String resp = httpGet(REMOTE_BASE_URL + "/api/messages?userId=" + a + "&with=" + b);
+                if (resp != null) {
+                    String[] lines = resp.split("\r?\n");
+                    for (String line : lines) {
+                        if (line.trim().isEmpty()) continue;
+                        String[] parts = line.split("\\|", -1);
+                        Map<String,Object> m = new java.util.HashMap<>();
+                        m.put("from", Integer.parseInt(parts[0]));
+                        m.put("to", Integer.parseInt(parts[1]));
+                        m.put("body", parts[2]);
+                        m.put("ts", Long.parseLong(parts[3]));
+                        out.add(m);
+                    }
+                }
+            } catch (Exception e) { }
+            return out;
+        }
         java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
         String sql = "SELECT from_user_id, to_user_id, body, created_at FROM messages WHERE (from_user_id=? AND to_user_id=?) OR (from_user_id=? AND to_user_id=?) ORDER BY created_at ASC";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -304,6 +417,16 @@ public class Database {
     }
 
     public static void sendMessage(int from, int to, String body) {
+        if (REMOTE_BASE_URL != null) {
+            try {
+                httpPostForm(REMOTE_BASE_URL + "/api/messages", mapOf(
+                        "from", String.valueOf(from),
+                        "to", String.valueOf(to),
+                        "body", body
+                ));
+                return;
+            } catch (Exception e) { /* ignore */ }
+        }
         String sql = "INSERT INTO messages(from_user_id, to_user_id, body, created_at) VALUES(?,?,?,?)";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, from);
@@ -315,6 +438,17 @@ public class Database {
     }
 
     public static void upsertPreferences(int userId, String gender, int age, String interests) {
+        if (REMOTE_BASE_URL != null) {
+            try {
+                httpPostForm(REMOTE_BASE_URL + "/api/preferences", mapOf(
+                        "userId", String.valueOf(userId),
+                        "gender", orEmpty(gender),
+                        "age", String.valueOf(age),
+                        "interests", orEmpty(interests)
+                ));
+                return;
+            } catch (Exception e) { /* fall through */ }
+        }
         String sql = "INSERT INTO preferences(user_id, gender_pref, age_pref, interests_pref) VALUES(?,?,?,?)\n" +
                 "ON CONFLICT(user_id) DO UPDATE SET gender_pref=excluded.gender_pref, age_pref=excluded.age_pref, interests_pref=excluded.interests_pref";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -327,6 +461,8 @@ public class Database {
             e.printStackTrace();
         }
     }
+
+    // (duplicate removed)
 
     public static Map<String, Object> getPreferences(int userId) {
         Map<String, Object> map = new HashMap<>();
@@ -355,4 +491,58 @@ public class Database {
             throw new RuntimeException(e);
         }
     }
+
+    // ---- HTTP helpers for remote mode (plain text protocol) ----
+    private static String httpGet(String urlStr) throws Exception {
+        java.net.URL url = java.net.URI.create(urlStr).toURL();
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setConnectTimeout(4000);
+        conn.setReadTimeout(8000);
+        try (java.io.InputStream in = conn.getInputStream()) {
+            return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+    }
+
+    private static String httpPostForm(String urlStr, java.util.Map<String,String> form) throws Exception {
+        java.net.URL url = java.net.URI.create(urlStr).toURL();
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setDoOutput(true);
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        String body = buildForm(form);
+        byte[] bytes = body.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        conn.setFixedLengthStreamingMode(bytes.length);
+        try (java.io.OutputStream os = conn.getOutputStream()) {
+            os.write(bytes);
+        }
+        try (java.io.InputStream in = conn.getInputStream()) {
+            return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+    }
+
+    private static String buildForm(java.util.Map<String,String> form) throws Exception {
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        for (var e : form.entrySet()) {
+            if (!first) sb.append('&');
+            first = false;
+            sb.append(java.net.URLEncoder.encode(e.getKey(), "UTF-8"));
+            sb.append('=');
+            sb.append(java.net.URLEncoder.encode(e.getValue()==null?"":e.getValue(), "UTF-8"));
+        }
+        return sb.toString();
+    }
+
+    private static String urlEncode(String s) throws Exception {
+        return java.net.URLEncoder.encode(s, "UTF-8");
+    }
+
+    private static Map<String,String> mapOf(String... kv) {
+        Map<String,String> m = new java.util.HashMap<>();
+        for (int i=0;i+1<kv.length;i+=2) m.put(kv[i], kv[i+1]);
+        return m;
+    }
+
+    private static String orEmpty(String s) { return s==null?"":s; }
 }
