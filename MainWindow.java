@@ -55,7 +55,34 @@ public class MainWindow extends JFrame {
         // Ask for optional server URL for multi-laptop demo
         String url = JOptionPane.showInputDialog(this, "Server URL (leave blank for local DB):", "http://localhost:8080");
         if (url != null && !url.trim().isEmpty()) {
-            Database.setRemoteBaseUrl(url.trim());
+            String u = url.trim();
+            Database.setRemoteBaseUrl(u);
+            // Quick connectivity check
+            boolean ok = false;
+            try {
+                // Use preferences call as ping fallback if server version lacks /api/ping
+                try {
+                    java.net.URL ping = java.net.URI.create(u + "/api/ping").toURL();
+                    java.net.HttpURLConnection hc = (java.net.HttpURLConnection) ping.openConnection();
+                    hc.setConnectTimeout(2000);
+                    hc.setReadTimeout(2000);
+                    hc.getInputStream().close();
+                    ok = true;
+                } catch(Exception ignore) {
+                    // attempt a tiny GET on candidates with minimal params, expect 400/200
+                    java.net.URL cand = java.net.URI.create(u + "/api/candidates?userId=0").toURL();
+                    java.net.HttpURLConnection hc2 = (java.net.HttpURLConnection) cand.openConnection();
+                    hc2.setConnectTimeout(2000);
+                    hc2.setReadTimeout(2000);
+                    try { hc2.getInputStream().close(); ok = true; } catch(Exception e2) { ok = hc2.getResponseCode() >= 200 && hc2.getResponseCode() < 500; }
+                }
+            } catch(Exception ex) { ok = false; }
+            if (!ok) {
+                JOptionPane.showMessageDialog(this, "Could not reach server. Staying in local mode.");
+                Database.setRemoteBaseUrl(null);
+            } else {
+                setTitle(getTitle() + "  |  Remote: " + u);
+            }
         }
     // Initialize database schema (used by local mode and also safe on server)
     Database.init();

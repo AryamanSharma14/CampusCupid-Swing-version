@@ -74,6 +74,10 @@ public class Database {
         }
         try (Connection conn = getConnection(); Statement st = conn.createStatement()) {
             st.execute("PRAGMA foreign_keys = ON");
+            // Performance & concurrency tweaks for smoother server responses
+            try { st.execute("PRAGMA busy_timeout = 5000"); } catch (SQLException ignore) {}
+            try { st.execute("PRAGMA journal_mode = WAL"); } catch (SQLException ignore) {}
+            try { st.execute("PRAGMA synchronous = NORMAL"); } catch (SQLException ignore) {}
             st.execute("CREATE TABLE IF NOT EXISTS users (\n" +
                     "  id INTEGER PRIMARY KEY AUTOINCREMENT,\n" +
                     "  email TEXT UNIQUE NOT NULL,\n" +
@@ -545,6 +549,22 @@ public class Database {
 
     public static Map<String, Object> getPreferences(int userId) {
         Map<String, Object> map = new HashMap<>();
+        if (REMOTE_BASE_URL != null) {
+            try {
+                String resp = httpGet(REMOTE_BASE_URL + "/api/preferences?userId=" + userId);
+                if (resp != null && !resp.trim().isEmpty() && !resp.trim().equals("NOTFOUND")) {
+                    String[] parts = resp.trim().split("\\|", -1);
+                    // gender|minAge|maxAge|interests
+                    if (parts.length >= 4) {
+                        map.put("gender", parts[0].isEmpty()? null : parts[0]);
+                        map.put("minAge", parts[1].isEmpty()? 18 : Integer.parseInt(parts[1]));
+                        map.put("maxAge", parts[2].isEmpty()? 60 : Integer.parseInt(parts[2]));
+                        map.put("interests", parts[3]);
+                    }
+                }
+            } catch (Exception e) { }
+            return map;
+        }
         String sql = "SELECT gender_pref, age_pref, min_age, max_age, interests_pref FROM preferences WHERE user_id=?";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, userId);
@@ -562,6 +582,12 @@ public class Database {
     }
 
     public static boolean hasProfile(int userId) {
+        if (REMOTE_BASE_URL != null) {
+            try {
+                String resp = httpGet(REMOTE_BASE_URL + "/api/profile?userId=" + userId);
+                return resp != null && !resp.trim().isEmpty() && !resp.trim().equals("NOTFOUND");
+            } catch (Exception e) { return false; }
+        }
         String sql = "SELECT 1 FROM profiles WHERE user_id=?";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, userId);
@@ -573,6 +599,26 @@ public class Database {
 
     public static Map<String,Object> getProfile(int userId) {
         Map<String,Object> m = new HashMap<>();
+        if (REMOTE_BASE_URL != null) {
+            try {
+                String resp = httpGet(REMOTE_BASE_URL + "/api/profile?userId=" + userId);
+                if (resp != null && !resp.trim().isEmpty() && !resp.trim().equals("NOTFOUND")) {
+                    String[] parts = resp.trim().split("\\|", -1);
+                    // name|gender|age|bio|interests|hobbies|occupation|photoUrl
+                    if (parts.length >= 8) {
+                        m.put("name", parts[0]);
+                        m.put("gender", parts[1]);
+                        m.put("age", parts[2].isEmpty()? null : Integer.parseInt(parts[2]));
+                        m.put("bio", parts[3]);
+                        m.put("interests", parts[4]);
+                        m.put("hobbies", parts[5]);
+                        m.put("occupation", parts[6]);
+                        m.put("photoUrl", parts[7]);
+                    }
+                }
+            } catch (Exception e) { }
+            return m;
+        }
         String sql = "SELECT name, gender, age, bio, interests, hobbies, occupation, photo_url FROM profiles WHERE user_id=?";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, userId);

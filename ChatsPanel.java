@@ -13,6 +13,10 @@ public class ChatsPanel extends JPanel {
     private JTextPane conversationArea;
     private javax.swing.text.StyledDocument doc;
     private javax.swing.Timer pollTimer;
+    private JPanel headerProfile;
+    private JLabel headerPhoto;
+    private JLabel headerName;
+    private JLabel headerMeta;
     private Integer selectedOtherId = null;
     private long lastTs = 0L;
     private final Map<Integer, Long> lastSeenPerUser = new HashMap<>();
@@ -36,10 +40,34 @@ public class ChatsPanel extends JPanel {
     chatList.setSelectionForeground(purple);
     chatList.setBorder(BorderFactory.createLineBorder(purple, 2));
 
-        JPanel conversationPanel = new JPanel();
+    JPanel conversationPanel = new JPanel();
         conversationPanel.setLayout(new BoxLayout(conversationPanel, BoxLayout.Y_AXIS));
         conversationPanel.setBackground(lightPurple);
         conversationPanel.setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
+
+    // Header with other user's profile info
+    headerProfile = new JPanel();
+    headerProfile.setLayout(new BoxLayout(headerProfile, BoxLayout.X_AXIS));
+    headerProfile.setBackground(new Color(245,245,255));
+    headerProfile.setBorder(BorderFactory.createEmptyBorder(8,8,8,8));
+    headerPhoto = new JLabel("🧑");
+    headerPhoto.setPreferredSize(new Dimension(48,48));
+    headerPhoto.setMaximumSize(new Dimension(48,48));
+    headerPhoto.setHorizontalAlignment(SwingConstants.CENTER);
+    headerName = new JLabel("");
+    headerName.setFont(new Font("Arial", Font.BOLD, 16));
+    headerName.setForeground(purple);
+    headerMeta = new JLabel("");
+    headerMeta.setFont(new Font("Arial", Font.PLAIN, 13));
+    headerMeta.setForeground(new Color(100,100,120));
+    JPanel headerText = new JPanel();
+    headerText.setLayout(new BoxLayout(headerText, BoxLayout.Y_AXIS));
+    headerText.setBackground(new Color(245,245,255));
+    headerText.add(headerName);
+    headerText.add(headerMeta);
+    headerProfile.add(headerPhoto);
+    headerProfile.add(Box.createHorizontalStrut(10));
+    headerProfile.add(headerText);
 
     conversationArea = new JTextPane();
         conversationArea.setEditable(false);
@@ -97,6 +125,8 @@ public class ChatsPanel extends JPanel {
 
     JScrollPane convoScroll = new JScrollPane(conversationArea);
     convoScroll.setBorder(BorderFactory.createLineBorder(new Color(220, 220, 220)));
+    conversationPanel.add(headerProfile);
+    conversationPanel.add(Box.createVerticalStrut(6));
     conversationPanel.add(convoScroll);
         conversationPanel.add(Box.createVerticalStrut(10));
         conversationPanel.add(inputPanel);
@@ -119,6 +149,7 @@ public class ChatsPanel extends JPanel {
                 lastTs = 0L;
                 Long seen = lastSeenPerUser.getOrDefault(selectedOtherId, 0L);
                 lastTs = Math.max(lastTs, seen);
+                loadOtherProfileHeader(otherId, chatListModel.get(idx));
                 try {
                     Integer uid = mainWindow.getLoggedInUserId();
                     if (uid == null) return;
@@ -244,5 +275,31 @@ public class ChatsPanel extends JPanel {
                 lastSeenPerUser.put(selectedOtherId, lastTs);
             }
         } catch (Exception ex) {}
+    }
+
+    private void loadOtherProfileHeader(int userId, String fallbackName) {
+        Map<String,Object> p = Database.getProfile(userId);
+        String name = p.getOrDefault("name", fallbackName == null? "" : fallbackName).toString();
+        String gender = p.getOrDefault("gender", "").toString();
+        Integer age = (Integer) p.get("age");
+        String meta = (gender==null?"":gender) + (age==null?"":"  •  Age " + age);
+        headerName.setText(name);
+        headerMeta.setText(meta.trim());
+        String photo = (String) p.get("photoUrl");
+        if (photo != null && !photo.isBlank()) {
+            try {
+                java.net.URL u = new java.net.URI(photo).toURL();
+                ImageIcon icon = new ImageIcon(u);
+                Image img = icon.getImage().getScaledInstance(48, 48, Image.SCALE_SMOOTH);
+                headerPhoto.setIcon(new ImageIcon(img));
+                headerPhoto.setText("");
+            } catch(Exception ex) {
+                headerPhoto.setIcon(null);
+                headerPhoto.setText("🧑");
+            }
+        } else {
+            headerPhoto.setIcon(null);
+            headerPhoto.setText("🧑");
+        }
     }
 }

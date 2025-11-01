@@ -47,6 +47,7 @@ public class ServerMain {
         server.createContext("/api/register", new RegisterHandler());
         server.createContext("/api/login", new LoginHandler());
     server.createContext("/api/profile", new ProfileHandler());
+        server.createContext("/api/ping", new PingHandler());
         server.createContext("/api/preferences", new PreferencesHandler());
         server.createContext("/api/candidates", new CandidatesHandler());
         server.createContext("/api/swipe", new SwipeHandler());
@@ -71,21 +72,62 @@ public class ServerMain {
             write200(ex, id == null ? "ERR" : String.valueOf(id));
         }
     }
+    static class PingHandler implements HttpHandler {
+        public void handle(HttpExchange ex) throws IOException {
+            // Quick health check and basic DB sanity
+            int users = 0;
+            try (java.sql.Connection c = Database.getConnection(); java.sql.Statement s = c.createStatement(); java.sql.ResultSet rs = s.executeQuery("SELECT COUNT(*) FROM users")) {
+                if (rs.next()) users = rs.getInt(1);
+            } catch (Exception ignore) {}
+            write200(ex, "PONG " + users);
+        }
+    }
     static class ProfileHandler implements HttpHandler {
         public void handle(HttpExchange ex) throws IOException {
+            if ("GET".equalsIgnoreCase(ex.getRequestMethod())) {
+                Map<String,String> q = readQuery(ex);
+                Integer uid = parseInt(q.get("userId"));
+                if (uid == null) { write400(ex, "Missing userId"); return; }
+                Map<String,Object> p = Database.getProfile(uid);
+                if (p == null || p.isEmpty()) { write200(ex, "NOTFOUND"); return; }
+                StringBuilder sb = new StringBuilder();
+                sb.append(nullToEmpty((String)p.get("name"))).append('|')
+                  .append(nullToEmpty((String)p.get("gender"))).append('|')
+                  .append(p.get("age")==null?"":String.valueOf(p.get("age"))).append('|')
+                  .append(nullToEmpty((String)p.get("bio"))).append('|')
+                  .append(nullToEmpty((String)p.get("interests"))).append('|')
+                  .append(nullToEmpty((String)p.get("hobbies"))).append('|')
+                  .append(nullToEmpty((String)p.get("occupation"))).append('|')
+                  .append(nullToEmpty((String)p.get("photoUrl")));
+                write200(ex, sb.toString());
+                return;
+            }
             Map<String,String> f = readForm(ex);
             Integer uid = parseInt(f.get("userId"));
             Integer age = parseInt(f.get("age"));
-            // Accept either explicit userId (legacy) or rely on provided userId
             if (uid != null) {
-        Database.upsertProfile(uid, f.get("name"), f.get("gender"), age,
-            f.get("bio"), f.get("interests"), f.get("hobbies"), f.get("occupation"), f.getOrDefault("photoUrl", ""));
+                Database.upsertProfile(uid, f.get("name"), f.get("gender"), age,
+                    f.get("bio"), f.get("interests"), f.get("hobbies"), f.get("occupation"), f.getOrDefault("photoUrl", ""));
                 write200(ex, "OK");
             } else write400(ex, "Missing userId");
         }
     }
     static class PreferencesHandler implements HttpHandler {
         public void handle(HttpExchange ex) throws IOException {
+            if ("GET".equalsIgnoreCase(ex.getRequestMethod())) {
+                Map<String,String> q = readQuery(ex);
+                Integer uid = parseInt(q.get("userId"));
+                if (uid == null) { write400(ex, "Missing userId"); return; }
+                Map<String,Object> m = Database.getPreferences(uid);
+                if (m == null || m.isEmpty()) { write200(ex, "NOTFOUND"); return; }
+                String gender = (String)m.get("gender");
+                Integer minAge = (Integer)m.get("minAge");
+                Integer maxAge = (Integer)m.get("maxAge");
+                String interests = (String)m.get("interests");
+                String body = nullToEmpty(gender) + '|' + (minAge==null?"":minAge) + '|' + (maxAge==null?"":maxAge) + '|' + nullToEmpty(interests);
+                write200(ex, body);
+                return;
+            }
             Map<String,String> f = readForm(ex);
             Integer uid = parseInt(f.get("userId"));
             Integer minAge = parseInt(f.get("minAge"));
