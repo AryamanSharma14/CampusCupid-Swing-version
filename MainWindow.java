@@ -108,7 +108,7 @@ public class MainWindow extends JFrame {
             Integer uid = Database.getUserIdByEmail(email);
             if (uid != null) {
                 // Seed profile with name so candidates show display name even before profile save
-                Database.upsertProfile(uid, name, null, null, "", "", "", "");
+                Database.upsertProfile(uid, name, null, null, "", "", "", "", "");
             }
         }
         return ok;
