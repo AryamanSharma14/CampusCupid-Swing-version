@@ -118,12 +118,23 @@ public class Database {
             } catch (SQLException ignore) {}
 
             st.execute("CREATE TABLE IF NOT EXISTS preferences (\n" +
-                    "  user_id INTEGER PRIMARY KEY,\n" +
-                    "  gender_pref TEXT DEFAULT 'Any',\n" +
-                    "  age_pref INTEGER DEFAULT 24,\n" +
-                    "  interests_pref TEXT DEFAULT '',\n" +
+            "  user_id INTEGER PRIMARY KEY,\n" +
+            "  gender_pref TEXT DEFAULT 'Any',\n" +
+            "  age_pref INTEGER DEFAULT 24,\n" +
+            "  min_age INTEGER DEFAULT 18,\n" +
+            "  max_age INTEGER DEFAULT 60,\n" +
+            "  interests_pref TEXT DEFAULT '',\n" +
                     "  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE\n" +
                     ")");
+            // Migration for preferences age range
+            try (PreparedStatement ps = conn.prepareStatement("PRAGMA table_info(preferences)")) {
+                java.util.Set<String> cols = new java.util.HashSet<>();
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) cols.add(rs.getString("name").toLowerCase());
+                }
+                if (!cols.contains("min_age")) st.execute("ALTER TABLE preferences ADD COLUMN min_age INTEGER DEFAULT 18");
+                if (!cols.contains("max_age")) st.execute("ALTER TABLE preferences ADD COLUMN max_age INTEGER DEFAULT 60");
+            } catch (SQLException ignore) {}
 
             st.execute("CREATE TABLE IF NOT EXISTS swipes (\n" +
                     "  id INTEGER PRIMARY KEY AUTOINCREMENT,\n" +
@@ -295,11 +306,11 @@ public class Database {
         return ps.executeQuery();
     }
 
-    public static java.util.List<Map<String, Object>> listCandidates(int userId, String genderPref, int agePref, String interestsPref) {
+    public static java.util.List<Map<String, Object>> listCandidates(int userId, String genderPref, int minAgePref, int maxAgePref, String interestsPref) {
         if (REMOTE_BASE_URL != null) {
             java.util.List<Map<String,Object>> out = new java.util.ArrayList<>();
             try {
-                String qs = String.format("?userId=%d&gender=%s&age=%d&interests=%s", userId, urlEncode(genderPref==null?"":genderPref), agePref, urlEncode(interestsPref==null?"":interestsPref));
+                String qs = String.format("?userId=%d&gender=%s&minAge=%d&maxAge=%d&interests=%s", userId, urlEncode(genderPref==null?"":genderPref), minAgePref, maxAgePref, urlEncode(interestsPref==null?"":interestsPref));
                 String resp = httpGet(REMOTE_BASE_URL + "/api/candidates" + qs);
                 if (resp != null) {
                     String[] lines = resp.split("\r?\n");
@@ -321,11 +332,11 @@ public class Database {
             return out;
         }
         java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
-        try (Connection conn = getConnection(); ResultSet rs = listCandidatesRaw(conn, userId, genderPref, agePref, interestsPref == null ? "" : interestsPref.toLowerCase())) {
+    try (Connection conn = getConnection(); ResultSet rs = listCandidatesRaw(conn, userId, genderPref, null, interestsPref == null ? "" : interestsPref.toLowerCase())) {
             while (rs.next()) {
                 Integer age = (Integer) rs.getObject("age");
                 String interests = rs.getString("interests");
-                boolean ageMatch = (age == null) || Math.abs(age - agePref) <= 2;
+        boolean ageMatch = (age == null) || (age >= minAgePref && age <= maxAgePref);
                 boolean interestsMatch = (interestsPref == null || interestsPref.isEmpty()) || (interests != null && interests.toLowerCase().contains(interestsPref));
                 if (ageMatch && interestsMatch) {
                     Map<String, Object> m = new HashMap<>();
@@ -500,25 +511,30 @@ public class Database {
         } catch (SQLException e) { e.printStackTrace(); }
     }
 
-    public static void upsertPreferences(int userId, String gender, int age, String interests) {
+    public static void upsertPreferences(int userId, String gender, int minAge, int maxAge, String interests) {
         if (REMOTE_BASE_URL != null) {
             try {
                 httpPostForm(REMOTE_BASE_URL + "/api/preferences", mapOf(
                         "userId", String.valueOf(userId),
                         "gender", orEmpty(gender),
-                        "age", String.valueOf(age),
+                        "minAge", String.valueOf(minAge),
+                        "maxAge", String.valueOf(maxAge),
                         "interests", orEmpty(interests)
                 ));
                 return;
             } catch (Exception e) { /* fall through */ }
         }
-        String sql = "INSERT INTO preferences(user_id, gender_pref, age_pref, interests_pref) VALUES(?,?,?,?)\n" +
-                "ON CONFLICT(user_id) DO UPDATE SET gender_pref=excluded.gender_pref, age_pref=excluded.age_pref, interests_pref=excluded.interests_pref";
+        String sql = "INSERT INTO preferences(user_id, gender_pref, age_pref, min_age, max_age, interests_pref) VALUES(?,?,?,?,?,?)\n" +
+                "ON CONFLICT(user_id) DO UPDATE SET gender_pref=excluded.gender_pref, age_pref=excluded.age_pref, min_age=excluded.min_age, max_age=excluded.max_age, interests_pref=excluded.interests_pref";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, userId);
             ps.setString(2, gender);
-            ps.setInt(3, age);
-            ps.setString(4, interests);
+            // keep age_pref for backward compatibility as midpoint
+            int midpoint = (minAge + maxAge) / 2;
+            ps.setInt(3, midpoint);
+            ps.setInt(4, minAge);
+            ps.setInt(5, maxAge);
+            ps.setString(6, interests);
             ps.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
@@ -529,18 +545,51 @@ public class Database {
 
     public static Map<String, Object> getPreferences(int userId) {
         Map<String, Object> map = new HashMap<>();
-        String sql = "SELECT gender_pref, age_pref, interests_pref FROM preferences WHERE user_id=?";
+        String sql = "SELECT gender_pref, age_pref, min_age, max_age, interests_pref FROM preferences WHERE user_id=?";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, userId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     map.put("gender", rs.getString("gender_pref"));
                     map.put("age", rs.getInt("age_pref"));
+                    map.put("minAge", rs.getObject("min_age") == null ? 18 : rs.getInt("min_age"));
+                    map.put("maxAge", rs.getObject("max_age") == null ? 60 : rs.getInt("max_age"));
                     map.put("interests", rs.getString("interests_pref"));
                 }
             }
         } catch (SQLException e) { }
         return map;
+    }
+
+    public static boolean hasProfile(int userId) {
+        String sql = "SELECT 1 FROM profiles WHERE user_id=?";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) { return false; }
+    }
+
+    public static Map<String,Object> getProfile(int userId) {
+        Map<String,Object> m = new HashMap<>();
+        String sql = "SELECT name, gender, age, bio, interests, hobbies, occupation, photo_url FROM profiles WHERE user_id=?";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    m.put("name", rs.getString("name"));
+                    m.put("gender", rs.getString("gender"));
+                    m.put("age", rs.getObject("age") == null ? null : rs.getInt("age"));
+                    m.put("bio", rs.getString("bio"));
+                    m.put("interests", rs.getString("interests"));
+                    m.put("hobbies", rs.getString("hobbies"));
+                    m.put("occupation", rs.getString("occupation"));
+                    m.put("photoUrl", rs.getString("photo_url"));
+                }
+            }
+        } catch (SQLException e) { }
+        return m;
     }
 
     private static String hashPassword(String password) {

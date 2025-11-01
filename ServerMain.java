@@ -17,8 +17,30 @@ public class ServerMain {
     Database.init();
     Database.seedDemoUsers();
 
-        int port = 8080;
-        HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
+        // Determine a port: prefer -Dport, then PORT env, then try 8080..8090
+        int desired = parsePortPref();
+        HttpServer server = null;
+        int port = desired;
+        if (port > 0) {
+            try {
+                server = HttpServer.create(new InetSocketAddress(port), 0);
+            } catch (java.net.BindException be) {
+                System.out.println("Port " + port + " busy, trying fallback range 8080-8090...");
+                server = null; // will fall through to range
+            }
+        }
+        if (server == null) {
+            for (int p = 8080; p <= 8090; p++) {
+                try {
+                    server = HttpServer.create(new InetSocketAddress(p), 0);
+                    port = p;
+                    break;
+                } catch (java.net.BindException be) {
+                    continue;
+                }
+            }
+        }
+        if (server == null) throw new RuntimeException("No free port found in 8080-8090; set -Dport to an open port.");
         server.createContext("/api/register", new RegisterHandler());
         server.createContext("/api/login", new LoginHandler());
     server.createContext("/api/profile", new ProfileHandler());
@@ -63,9 +85,10 @@ public class ServerMain {
         public void handle(HttpExchange ex) throws IOException {
             Map<String,String> f = readForm(ex);
             Integer uid = parseInt(f.get("userId"));
-            Integer age = parseInt(f.get("age"));
-            if (uid != null && age != null) {
-                Database.upsertPreferences(uid, f.get("gender"), age, f.get("interests"));
+            Integer minAge = parseInt(f.get("minAge"));
+            Integer maxAge = parseInt(f.get("maxAge"));
+            if (uid != null && minAge != null && maxAge != null) {
+                Database.upsertPreferences(uid, f.get("gender"), minAge, maxAge, f.get("interests"));
                 write200(ex, "OK");
             } else write400(ex, "Missing fields");
         }
@@ -75,10 +98,12 @@ public class ServerMain {
             Map<String,String> q = readQuery(ex);
             Integer uid = parseInt(q.get("userId"));
             String gender = q.getOrDefault("gender", "Any");
-            Integer age = parseInt(q.getOrDefault("age", "24"));
+            Integer minAge = parseInt(q.getOrDefault("minAge", "18"));
+            Integer maxAge = parseInt(q.getOrDefault("maxAge", "60"));
             String interests = q.getOrDefault("interests", "");
-            if (uid == null || age == null) { write400(ex, "Missing userId/age"); return; }
-            List<Map<String,Object>> rows = Database.listCandidates(uid, gender, age, interests);
+            if (uid == null) { write400(ex, "Missing userId"); return; }
+            if (minAge == null) minAge = 18; if (maxAge == null) maxAge = 60;
+            List<Map<String,Object>> rows = Database.listCandidates(uid, gender, minAge, maxAge, interests);
             StringBuilder sb = new StringBuilder();
             for (Map<String,Object> r : rows) {
                 sb.append(r.get("id")).append('|')
@@ -193,5 +218,14 @@ public class ServerMain {
         try (OutputStream os = ex.getResponseBody()) {
             os.write(b);
         }
+    }
+
+    // Port selection helpers
+    static int parsePortPref() {
+        Integer p = parseInt(System.getProperty("port"));
+        if (p != null && p > 0 && p < 65536) return p;
+        p = parseInt(System.getenv("PORT"));
+        if (p != null && p > 0 && p < 65536) return p;
+        return -1;
     }
 }

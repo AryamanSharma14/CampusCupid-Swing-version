@@ -1,9 +1,22 @@
-
 import javax.swing.*;
 import java.awt.*;
 
 public class ProfilePanel extends JPanel {
+    // Keep references to controls for refresh
+    private final MainWindow mainWindow;
+    private JLabel avatar;
+    private JTextField nameField;
+    private JComboBox<String> genderCombo;
+    private JSpinner ageSpinner;
+    private JTextField photoField;
+    private JTextArea bioArea;
+    private JTextField interestsField;
+    private JTextField hobbiesField;
+    private JTextField occupationField;
+    private JLabel messageLabel;
+
     public ProfilePanel(MainWindow mainWindow) {
+        this.mainWindow = mainWindow;
         setLayout(new BorderLayout(10,10));
 
         Color purple = new Color(102, 0, 204);
@@ -15,7 +28,7 @@ public class ProfilePanel extends JPanel {
         profileCard.setBorder(BorderFactory.createEmptyBorder(30, 40, 30, 40));
         profileCard.setBackground(lightPurple);
 
-    JLabel avatar = new JLabel();
+    avatar = new JLabel();
         avatar.setPreferredSize(new Dimension(100,100));
         avatar.setMaximumSize(new Dimension(100,100));
         avatar.setOpaque(true);
@@ -34,7 +47,7 @@ public class ProfilePanel extends JPanel {
         nameLabel.setFont(new Font("Arial", Font.PLAIN, 16));
         nameLabel.setForeground(purple);
         nameLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        JTextField nameField = new JTextField(20);
+    nameField = new JTextField(20);
         nameField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
         nameField.setHorizontalAlignment(JTextField.CENTER);
 
@@ -43,7 +56,7 @@ public class ProfilePanel extends JPanel {
     genderLabel.setForeground(purple);
     genderLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
     String[] genders = {"Male", "Female", "Other"};
-    JComboBox<String> genderCombo = new JComboBox<>(genders);
+    genderCombo = new JComboBox<>(genders);
     genderCombo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
     genderCombo.setAlignmentX(Component.CENTER_ALIGNMENT);
 
@@ -51,22 +64,24 @@ public class ProfilePanel extends JPanel {
     ageLabel.setFont(new Font("Arial", Font.PLAIN, 16));
     ageLabel.setForeground(purple);
     ageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-    JSpinner ageSpinner = new JSpinner(new SpinnerNumberModel(21, 18, 60, 1));
+    ageSpinner = new JSpinner(new SpinnerNumberModel(21, 18, 60, 1));
     ageSpinner.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 
     JLabel photoLabel = new JLabel("Photo URL:");
     photoLabel.setFont(new Font("Arial", Font.PLAIN, 16));
     photoLabel.setForeground(purple);
     photoLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-    JTextField photoField = new JTextField(20);
+    photoField = new JTextField(20);
     photoField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
     photoField.setHorizontalAlignment(JTextField.CENTER);
+
+    
 
     JLabel bioLabel = new JLabel("Bio:");
     bioLabel.setFont(new Font("Arial", Font.PLAIN, 16));
     bioLabel.setForeground(purple);
     bioLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-    JTextArea bioArea = new JTextArea(3, 20);
+    bioArea = new JTextArea(3, 20);
     bioArea.setLineWrap(true);
     bioArea.setWrapStyleWord(true);
     bioArea.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
@@ -78,7 +93,7 @@ public class ProfilePanel extends JPanel {
     interestsLabel.setFont(new Font("Arial", Font.PLAIN, 16));
     interestsLabel.setForeground(purple);
     interestsLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-    JTextField interestsField = new JTextField(20);
+    interestsField = new JTextField(20);
     interestsField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
     interestsField.setHorizontalAlignment(JTextField.CENTER);
 
@@ -86,7 +101,7 @@ public class ProfilePanel extends JPanel {
     hobbiesLabel.setFont(new Font("Arial", Font.PLAIN, 16));
     hobbiesLabel.setForeground(purple);
     hobbiesLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-    JTextField hobbiesField = new JTextField(20);
+    hobbiesField = new JTextField(20);
     hobbiesField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
     hobbiesField.setHorizontalAlignment(JTextField.CENTER);
 
@@ -94,9 +109,12 @@ public class ProfilePanel extends JPanel {
     occupationLabel.setFont(new Font("Arial", Font.PLAIN, 16));
     occupationLabel.setForeground(purple);
     occupationLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-    JTextField occupationField = new JTextField(20);
+    occupationField = new JTextField(20);
     occupationField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
     occupationField.setHorizontalAlignment(JTextField.CENTER);
+
+    // Initial prefill if user already logged in
+    refresh();
 
     
 
@@ -110,10 +128,10 @@ public class ProfilePanel extends JPanel {
     goToPreferencesButton.setForeground(purple);
     goToPreferencesButton.setFont(new Font("Arial", Font.BOLD, 16));
     goToPreferencesButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        JLabel messageLabel = new JLabel("");
-        messageLabel.setForeground(new Color(0, 153, 51));
-        messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        messageLabel.setFont(new Font("Arial", Font.BOLD, 14));
+    messageLabel = new JLabel("");
+    messageLabel.setForeground(new Color(0, 153, 51));
+    messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+    messageLabel.setFont(new Font("Arial", Font.BOLD, 14));
 
         profileCard.add(avatar);
         profileCard.add(Box.createVerticalStrut(15));
@@ -168,7 +186,7 @@ public class ProfilePanel extends JPanel {
                     String url = photoField.getText().trim();
                     if (!url.isEmpty()) {
                         try {
-                            java.net.URL u = new java.net.URL(url);
+                            java.net.URL u = new java.net.URI(url).toURL();
                             ImageIcon icon = new ImageIcon(u);
                             Image img = icon.getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH);
                             avatar.setText("");
@@ -192,5 +210,42 @@ public class ProfilePanel extends JPanel {
                 messageLabel.setForeground(Color.RED);
             }
         });
+    }
+
+    // Reload the form fields from the database for the logged-in user
+    public void refresh() {
+        if (mainWindow == null) return;
+        Integer uid = mainWindow.getLoggedInUserId();
+        if (uid == null) return;
+        java.util.Map<String,Object> prof = Database.getProfile(uid);
+        if (prof != null && !prof.isEmpty()) {
+            if (prof.get("name") != null) nameField.setText((String)prof.get("name"));
+            if (prof.get("gender") != null) genderCombo.setSelectedItem((String)prof.get("gender"));
+            if (prof.get("age") != null) ageSpinner.setValue((Integer)prof.get("age"));
+            if (prof.get("bio") != null) bioArea.setText((String)prof.get("bio"));
+            if (prof.get("interests") != null) interestsField.setText((String)prof.get("interests"));
+            if (prof.get("hobbies") != null) hobbiesField.setText((String)prof.get("hobbies"));
+            if (prof.get("occupation") != null) occupationField.setText((String)prof.get("occupation"));
+            String purl = (String) prof.get("photoUrl");
+            photoField.setText(purl == null ? "" : purl);
+            if (purl != null && !purl.isBlank()) {
+                try {
+                    java.net.URL u = new java.net.URI(purl).toURL();
+                    ImageIcon icon = new ImageIcon(u);
+                    Image img = icon.getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH);
+                    avatar.setText("");
+                    avatar.setIcon(new ImageIcon(img));
+                } catch(Exception ignore) {
+                    avatar.setIcon(null);
+                    avatar.setText("👤");
+                }
+            } else {
+                avatar.setIcon(null);
+                avatar.setText("👤");
+            }
+        }
+        if (messageLabel != null) {
+            messageLabel.setText("");
+        }
     }
 }

@@ -27,29 +27,31 @@ public class PreferencesPanel extends JPanel {
         genderCombo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
         genderCombo.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JLabel ageLabel = new JLabel("Preferred Age:");
+    JLabel ageLabel = new JLabel("Age Range:");
         ageLabel.setFont(new Font("Arial", Font.PLAIN, 16));
         ageLabel.setForeground(purple);
         ageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
     // Load saved preferences
     String savedGender = mainWindow.getPrefGender();
-    int savedAge = mainWindow.getPrefAge();
+    int savedMin = mainWindow.getPrefMinAge();
+    int savedMax = mainWindow.getPrefMaxAge();
     String savedInterests = mainWindow.getPrefInterests();
 
-    // Age slider 18..60, default 24
-    int initialAge = (savedAge >= 18 && savedAge <= 60) ? savedAge : 24;
-    JSlider ageSlider = new JSlider(18, 60, initialAge);
-        ageSlider.setMajorTickSpacing(6);
-        ageSlider.setMinorTickSpacing(1);
-        ageSlider.setPaintTicks(true);
-        ageSlider.setPaintLabels(true);
-        ageSlider.setBackground(lightPurple);
-        ageSlider.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        JLabel ageValue = new JLabel("Selected: " + initialAge + " years");
-        ageValue.setFont(new Font("Arial", Font.PLAIN, 14));
-        ageValue.setForeground(purple);
-        ageValue.setAlignmentX(Component.CENTER_ALIGNMENT);
+    // Min / Max age spinners 18..60
+    int initMin = (savedMin >= 18 && savedMin <= 60) ? savedMin : 18;
+    int initMax = (savedMax >= 18 && savedMax <= 60 && savedMax >= initMin) ? savedMax : 24;
+    JLabel minAgeLabel = new JLabel("Min Age:");
+    minAgeLabel.setFont(new Font("Arial", Font.PLAIN, 16));
+    minAgeLabel.setForeground(purple);
+    minAgeLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+    JSpinner minAgeSpinner = new JSpinner(new SpinnerNumberModel(initMin, 18, 60, 1));
+    minAgeSpinner.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+    JLabel maxAgeLabel = new JLabel("Max Age:");
+    maxAgeLabel.setFont(new Font("Arial", Font.PLAIN, 16));
+    maxAgeLabel.setForeground(purple);
+    maxAgeLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+    JSpinner maxAgeSpinner = new JSpinner(new SpinnerNumberModel(initMax, 18, 60, 1));
+    maxAgeSpinner.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 
         JLabel interestsLabel = new JLabel("Interests:");
         interestsLabel.setFont(new Font("Arial", Font.PLAIN, 16));
@@ -87,8 +89,11 @@ public class PreferencesPanel extends JPanel {
         prefCard.add(genderCombo);
         prefCard.add(Box.createVerticalStrut(10));
         prefCard.add(ageLabel);
-    prefCard.add(ageSlider);
-    prefCard.add(ageValue);
+    prefCard.add(minAgeLabel);
+    prefCard.add(minAgeSpinner);
+    prefCard.add(Box.createVerticalStrut(8));
+    prefCard.add(maxAgeLabel);
+    prefCard.add(maxAgeSpinner);
         prefCard.add(Box.createVerticalStrut(10));
         prefCard.add(interestsLabel);
         prefCard.add(interestsField);
@@ -101,24 +106,23 @@ public class PreferencesPanel extends JPanel {
 
         add(prefCard, BorderLayout.CENTER);
 
-        // Live update label as slider moves
-        ageSlider.addChangeListener(e -> {
-            ageValue.setText("Selected: " + ageSlider.getValue() + " years");
-        });
-
         saveButton.addActionListener(e -> {
             String genderPref = (String) genderCombo.getSelectedItem();
-            int agePref = ageSlider.getValue();
+            int minAge = (Integer) minAgeSpinner.getValue();
+            int maxAge = (Integer) maxAgeSpinner.getValue();
+            if (maxAge < minAge) { int tmp = minAge; minAge = maxAge; maxAge = tmp; }
             String interestsPref = interestsField.getText().trim().toLowerCase();
-            mainWindow.setUserPreferences(genderPref, agePref, interestsPref);
+            mainWindow.setUserPreferences(genderPref, minAge, maxAge, interestsPref);
             messageLabel.setText("Preferences saved! Redirecting to Swipe...");
             mainWindow.showScreen("swipe");
         });
         goToSwipeButton.addActionListener(e -> {
             String genderPref = (String) genderCombo.getSelectedItem();
-            int agePref = ageSlider.getValue();
+            int minAge = (Integer) minAgeSpinner.getValue();
+            int maxAge = (Integer) maxAgeSpinner.getValue();
+            if (maxAge < minAge) { int tmp = minAge; minAge = maxAge; maxAge = tmp; }
             String interestsPref = interestsField.getText().trim().toLowerCase();
-            mainWindow.setUserPreferences(genderPref, agePref, interestsPref);
+            mainWindow.setUserPreferences(genderPref, minAge, maxAge, interestsPref);
             mainWindow.showScreen("swipe");
         });
     }

@@ -1,7 +1,6 @@
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -10,6 +9,7 @@ public class SwipePanel extends JPanel {
     
     private static final Color purple = new Color(128, 0, 128);
     private static final Color lightPurple = new Color(230, 210, 255);
+    private final MainWindow mainWindow;
     private ArrayList<Candidate> candidates;
     private int currentIndex = 0;
     private JLabel nameLabel, imageLabel, bioLabel;
@@ -18,6 +18,7 @@ public class SwipePanel extends JPanel {
     private JLabel matchLabel;
 
     public SwipePanel(MainWindow mainWindow) {
+        this.mainWindow = mainWindow;
 
     setLayout(new BorderLayout(10,10));
 
@@ -133,8 +134,7 @@ public class SwipePanel extends JPanel {
             mainWindow.showScreen("chats");
         });
         refreshButton.addActionListener(e -> {
-            loadCandidates(mainWindow);
-            updateCandidateCard();
+            reload();
             matchLabel.setText("Candidates refreshed!");
         });
     }
@@ -144,9 +144,10 @@ public class SwipePanel extends JPanel {
         Integer uid = mainWindow.getLoggedInUserId();
         if (uid == null) return;
         String prefGender = mainWindow.getPrefGender();
-        int prefAge = mainWindow.getPrefAge();
+    int prefMinAge = mainWindow.getPrefMinAge();
+    int prefMaxAge = mainWindow.getPrefMaxAge();
         String prefInterests = mainWindow.getPrefInterests();
-        List<Map<String,Object>> rows = Database.listCandidates(uid, prefGender, prefAge, prefInterests);
+    List<Map<String,Object>> rows = Database.listCandidates(uid, prefGender, prefMinAge, prefMaxAge, prefInterests);
         for (Map<String,Object> r : rows) {
             Integer age = (Integer) r.get("age");
             candidates.add(new Candidate(
@@ -162,13 +163,19 @@ public class SwipePanel extends JPanel {
         currentIndex = 0;
     }
 
+    // Reload candidates based on current preferences
+    public void reload() {
+        loadCandidates(mainWindow);
+        updateCandidateCard();
+    }
+
     private void updateCandidateCard() {
         if (currentIndex < candidates.size()) {
             Candidate c = candidates.get(currentIndex);
             nameLabel.setText(c.name + " (" + c.gender + ", Age: " + c.age + ")");
             if (c.image != null && !c.image.isBlank()) {
                 try {
-                    java.net.URL u = new java.net.URL(c.image);
+                    java.net.URL u = new java.net.URI(c.image).toURL();
                     ImageIcon icon = new ImageIcon(u);
                     Image img = icon.getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH);
                     imageLabel.setIcon(new ImageIcon(img));

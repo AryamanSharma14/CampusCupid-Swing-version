@@ -5,24 +5,32 @@ import java.util.Map;
 public class MainWindow extends JFrame {
     // Store user preferences
     private String prefGender = "Any";
-    private int prefAge = 24;
+    private int prefMinAge = 18;
+    private int prefMaxAge = 60;
     private String prefInterests = "";
     private Integer loggedInUserId = null;
 
-    public void setUserPreferences(String gender, int age, String interests) {
+    public void setUserPreferences(String gender, int minAge, int maxAge, String interests) {
         this.prefGender = gender;
-        this.prefAge = age;
+        this.prefMinAge = minAge;
+        this.prefMaxAge = maxAge;
         this.prefInterests = interests;
         if (loggedInUserId != null) {
-            Database.upsertPreferences(loggedInUserId, gender, age, interests);
+            Database.upsertPreferences(loggedInUserId, gender, minAge, maxAge, interests);
         }
     }
 
     public String getPrefGender() { return prefGender; }
-    public int getPrefAge() { return prefAge; }
+    public int getPrefMinAge() { return prefMinAge; }
+    public int getPrefMaxAge() { return prefMaxAge; }
     public String getPrefInterests() { return prefInterests; }
     private CardLayout cardLayout;
     private JPanel mainPanel;
+    // Keep references to panels so we can refresh data when shown
+    private ProfilePanel profilePanel;
+    private PreferencesPanel preferencesPanel;
+    private SwipePanel swipePanel;
+    private ChatsPanel chatsPanel;
     // Store logged-in user
     private String loggedInEmail = null;
     // Track if profile is completed
@@ -49,19 +57,29 @@ public class MainWindow extends JFrame {
         if (url != null && !url.trim().isEmpty()) {
             Database.setRemoteBaseUrl(url.trim());
         }
-        // Initialize database schema (used by local mode and also safe on server)
-        Database.init();
+    // Initialize database schema (used by local mode and also safe on server)
+    Database.init();
+    // Ensure there are candidates even in local mode; safe no-op if already seeded
+    Database.seedDemoUsers();
 
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
 
         // Add screens
-    mainPanel.add(new LoginPanel(this), "login");
-    mainPanel.add(new RegistrationPanel(this), "register");
-    mainPanel.add(new ProfilePanel(this), "profile");
-    mainPanel.add(new PreferencesPanel(this), "preferences");
-    mainPanel.add(new SwipePanel(this), "swipe");
-    mainPanel.add(new ChatsPanel(this), "chats");
+        mainPanel.add(new LoginPanel(this), "login");
+        mainPanel.add(new RegistrationPanel(this), "register");
+        profilePanel = new ProfilePanel(this);
+        profilePanel.setName("profile");
+        mainPanel.add(profilePanel, "profile");
+        preferencesPanel = new PreferencesPanel(this);
+        preferencesPanel.setName("preferences");
+        mainPanel.add(preferencesPanel, "preferences");
+        swipePanel = new SwipePanel(this);
+        swipePanel.setName("swipe");
+        mainPanel.add(swipePanel, "swipe");
+        chatsPanel = new ChatsPanel(this);
+        chatsPanel.setName("chats");
+        mainPanel.add(chatsPanel, "chats");
 
         add(mainPanel);
         showScreen("login");
@@ -97,6 +115,14 @@ public class MainWindow extends JFrame {
                 return;
             }
         }
+        // If navigating to profile after login, refresh its fields from DB
+        if (name.equals("profile") && profilePanel != null) {
+            profilePanel.refresh();
+        }
+        // If navigating to swipe, ensure it reloads candidates from current preferences
+        if (name.equals("swipe") && swipePanel != null) {
+            swipePanel.reload();
+        }
         cardLayout.show(mainPanel, name);
     }
 
@@ -123,8 +149,10 @@ public class MainWindow extends JFrame {
             // Load saved preferences for this user, if any
             Map<String, Object> p = Database.getPreferences(uid);
             if (p.get("gender") != null) this.prefGender = (String) p.get("gender");
-            if (p.get("age") != null) this.prefAge = (Integer) p.get("age");
+            if (p.get("minAge") != null) this.prefMinAge = (Integer) p.get("minAge");
+            if (p.get("maxAge") != null) this.prefMaxAge = (Integer) p.get("maxAge");
             if (p.get("interests") != null) this.prefInterests = (String) p.get("interests");
+            if (Database.hasProfile(uid)) this.profileCompleted = true;
             return true;
         }
         return false;
