@@ -64,16 +64,16 @@ public class MainWindow extends JFrame {
                 try {
                     java.net.URL ping = java.net.URI.create(u + "/api/ping").toURL();
                     java.net.HttpURLConnection hc = (java.net.HttpURLConnection) ping.openConnection();
-                    hc.setConnectTimeout(2000);
-                    hc.setReadTimeout(2000);
+                    hc.setConnectTimeout(5000);
+                    hc.setReadTimeout(7000);
                     hc.getInputStream().close();
                     ok = true;
                 } catch(Exception ignore) {
                     // attempt a tiny GET on candidates with minimal params, expect 400/200
                     java.net.URL cand = java.net.URI.create(u + "/api/candidates?userId=0").toURL();
                     java.net.HttpURLConnection hc2 = (java.net.HttpURLConnection) cand.openConnection();
-                    hc2.setConnectTimeout(2000);
-                    hc2.setReadTimeout(2000);
+                    hc2.setConnectTimeout(5000);
+                    hc2.setReadTimeout(7000);
                     try { hc2.getInputStream().close(); ok = true; } catch(Exception e2) { ok = hc2.getResponseCode() >= 200 && hc2.getResponseCode() < 500; }
                 }
             } catch(Exception ex) { ok = false; }
