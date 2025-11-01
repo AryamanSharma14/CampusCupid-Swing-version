@@ -27,7 +27,7 @@ public class PreferencesPanel extends JPanel {
         genderCombo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
         genderCombo.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JLabel ageLabel = new JLabel("Age Range:");
+        JLabel ageLabel = new JLabel("Preferred Age:");
         ageLabel.setFont(new Font("Arial", Font.PLAIN, 16));
         ageLabel.setForeground(purple);
         ageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -36,12 +36,20 @@ public class PreferencesPanel extends JPanel {
     int savedAge = mainWindow.getPrefAge();
     String savedInterests = mainWindow.getPrefInterests();
 
-    JSlider ageSlider = new JSlider(30, 50, Math.max(30, Math.min(50, savedAge)));
-        ageSlider.setMajorTickSpacing(2);
+    // Age slider 18..60, default 24
+    int initialAge = (savedAge >= 18 && savedAge <= 60) ? savedAge : 24;
+    JSlider ageSlider = new JSlider(18, 60, initialAge);
+        ageSlider.setMajorTickSpacing(6);
+        ageSlider.setMinorTickSpacing(1);
         ageSlider.setPaintTicks(true);
         ageSlider.setPaintLabels(true);
         ageSlider.setBackground(lightPurple);
         ageSlider.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel ageValue = new JLabel("Selected: " + initialAge + " years");
+        ageValue.setFont(new Font("Arial", Font.PLAIN, 14));
+        ageValue.setForeground(purple);
+        ageValue.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         JLabel interestsLabel = new JLabel("Interests:");
         interestsLabel.setFont(new Font("Arial", Font.PLAIN, 16));
@@ -58,14 +66,14 @@ public class PreferencesPanel extends JPanel {
         }
         interestsField.setText(savedInterests != null ? savedInterests : "");
 
-        JButton saveButton = new JButton("Save Preferences");
-        saveButton.setBackground(Color.GREEN);
-        saveButton.setForeground(Color.WHITE);
+    JButton saveButton = new JButton("Save Preferences");
+    saveButton.setBackground(purple);
+    saveButton.setForeground(Color.WHITE);
         saveButton.setFont(new Font("Arial", Font.BOLD, 16));
         saveButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         JButton goToSwipeButton = new JButton("Go to Swipe");
-        goToSwipeButton.setBackground(purple);
-        goToSwipeButton.setForeground(Color.WHITE);
+    goToSwipeButton.setBackground(Color.WHITE);
+    goToSwipeButton.setForeground(purple);
         goToSwipeButton.setFont(new Font("Arial", Font.BOLD, 16));
         goToSwipeButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         JLabel messageLabel = new JLabel("");
@@ -79,7 +87,8 @@ public class PreferencesPanel extends JPanel {
         prefCard.add(genderCombo);
         prefCard.add(Box.createVerticalStrut(10));
         prefCard.add(ageLabel);
-        prefCard.add(ageSlider);
+    prefCard.add(ageSlider);
+    prefCard.add(ageValue);
         prefCard.add(Box.createVerticalStrut(10));
         prefCard.add(interestsLabel);
         prefCard.add(interestsField);
@@ -91,6 +100,11 @@ public class PreferencesPanel extends JPanel {
         prefCard.add(messageLabel);
 
         add(prefCard, BorderLayout.CENTER);
+
+        // Live update label as slider moves
+        ageSlider.addChangeListener(e -> {
+            ageValue.setText("Selected: " + ageSlider.getValue() + " years");
+        });
 
         saveButton.addActionListener(e -> {
             String genderPref = (String) genderCombo.getSelectedItem();
