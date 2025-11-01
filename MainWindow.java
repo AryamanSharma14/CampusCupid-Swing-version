@@ -59,8 +59,6 @@ public class MainWindow extends JFrame {
         }
     // Initialize database schema (used by local mode and also safe on server)
     Database.init();
-    // Ensure there are candidates even in local mode; safe no-op if already seeded
-    Database.seedDemoUsers();
 
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);

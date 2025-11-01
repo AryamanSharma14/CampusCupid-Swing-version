@@ -3,9 +3,22 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
 public class ChatsPanel extends JPanel {
+    private final MainWindow mainWindow;
+    private final DefaultListModel<String> chatListModel = new DefaultListModel<>();
+    private final DefaultListModel<Integer> chatIdModel = new DefaultListModel<>();
+    private JList<String> chatList;
+    private JTextPane conversationArea;
+    private javax.swing.text.StyledDocument doc;
+    private javax.swing.Timer pollTimer;
+    private Integer selectedOtherId = null;
+    private long lastTs = 0L;
+    private final Map<Integer, Long> lastSeenPerUser = new HashMap<>();
+
     public ChatsPanel(MainWindow mainWindow) {
+        this.mainWindow = mainWindow;
         setLayout(new BorderLayout(10,10));
         Color purple = new Color(102, 0, 204);
         Color lightPurple = new Color(230, 220, 255);
@@ -16,9 +29,7 @@ public class ChatsPanel extends JPanel {
         titleLabel.setForeground(purple);
         titleLabel.setBorder(BorderFactory.createEmptyBorder(20,0,10,0));
 
-    DefaultListModel<String> chatListModel = new DefaultListModel<>();
-    DefaultListModel<Integer> chatIdModel = new DefaultListModel<>();
-    JList<String> chatList = new JList<>(chatListModel);
+    chatList = new JList<>(chatListModel);
     chatList.setFont(new Font("Arial", Font.PLAIN, 16));
     chatList.setBackground(Color.WHITE);
     chatList.setSelectionBackground(new Color(180, 140, 255));
@@ -30,7 +41,7 @@ public class ChatsPanel extends JPanel {
         conversationPanel.setBackground(lightPurple);
         conversationPanel.setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
 
-    JTextPane conversationArea = new JTextPane();
+    conversationArea = new JTextPane();
         conversationArea.setEditable(false);
         conversationArea.setFont(new Font("Segoe UI", Font.PLAIN, 16));
         conversationArea.setBackground(Color.WHITE);
@@ -38,10 +49,10 @@ public class ChatsPanel extends JPanel {
         conversationArea.setText("");
 
         
-        javax.swing.text.StyleContext sc = new javax.swing.text.StyleContext();
-        javax.swing.text.Style userStyle = sc.addStyle("user", null);
-        javax.swing.text.Style otherStyle = sc.addStyle("other", null);
-        javax.swing.text.Style timeStyle = sc.addStyle("time", null);
+    javax.swing.text.StyleContext sc = new javax.swing.text.StyleContext();
+    javax.swing.text.Style userStyle = sc.addStyle("user", null);
+    javax.swing.text.Style otherStyle = sc.addStyle("other", null);
+    javax.swing.text.Style timeStyle = sc.addStyle("time", null);
         javax.swing.text.StyleConstants.setFontFamily(userStyle, "Segoe UI");
         javax.swing.text.StyleConstants.setFontSize(userStyle, 16);
         javax.swing.text.StyleConstants.setForeground(userStyle, new Color(102,0,204));
@@ -53,6 +64,8 @@ public class ChatsPanel extends JPanel {
         javax.swing.text.StyleConstants.setFontFamily(timeStyle, "Segoe UI");
         javax.swing.text.StyleConstants.setFontSize(timeStyle, 12);
         javax.swing.text.StyleConstants.setForeground(timeStyle, new Color(150,150,150));
+
+    doc = conversationArea.getStyledDocument();
 
         
         Runnable loadMatches = () -> {
@@ -82,7 +95,9 @@ public class ChatsPanel extends JPanel {
         inputPanel.add(Box.createHorizontalStrut(10));
         inputPanel.add(sendButton);
 
-        conversationPanel.add(conversationArea);
+    JScrollPane convoScroll = new JScrollPane(conversationArea);
+    convoScroll.setBorder(BorderFactory.createLineBorder(new Color(220, 220, 220)));
+    conversationPanel.add(convoScroll);
         conversationPanel.add(Box.createVerticalStrut(10));
         conversationPanel.add(inputPanel);
 
@@ -99,18 +114,28 @@ public class ChatsPanel extends JPanel {
                 int idx = chatList.getSelectedIndex();
                 if (idx < 0) return;
                 Integer otherId = chatIdModel.get(idx);
-                javax.swing.text.StyledDocument doc = conversationArea.getStyledDocument();
+                selectedOtherId = otherId;
                 conversationArea.setText("");
+                lastTs = 0L;
+                Long seen = lastSeenPerUser.getOrDefault(selectedOtherId, 0L);
+                lastTs = Math.max(lastTs, seen);
                 try {
                     Integer uid = mainWindow.getLoggedInUserId();
                     if (uid == null) return;
                     List<Map<String,Object>> msgs = Database.getMessagesBetween(uid, otherId);
                     for (Map<String,Object> m : msgs) {
                         boolean fromOther = ((Integer)m.get("from")).intValue() == otherId;
-                        doc.insertString(doc.getLength(), fromOther ? (chatListModel.get(idx)+": ") : "You: ", fromOther ? otherStyle : userStyle);
+                        String who = fromOther ? (chatListModel.get(idx)+": ") : "You: ";
+                        doc.insertString(doc.getLength(), who, fromOther ? otherStyle : userStyle);
                         doc.insertString(doc.getLength(), (String)m.get("body") + "\n", null);
+                        if (m.get("ts") != null) {
+                            long ts = ((Number)m.get("ts")).longValue();
+                            if (ts > lastTs) lastTs = ts;
+                        }
                     }
+                    conversationArea.setCaretPosition(doc.getLength());
                 } catch (Exception ex) {}
+                startPolling(otherStyle, userStyle);
             }
         });
 
@@ -123,9 +148,8 @@ public class ChatsPanel extends JPanel {
                         Integer otherId = chatIdModel.get(idx);
                         Integer uid = mainWindow.getLoggedInUserId();
                         if (uid != null) Database.sendMessage(uid, otherId, msg);
-                        javax.swing.text.StyledDocument doc = conversationArea.getStyledDocument();
-                        doc.insertString(doc.getLength(), "You: ", userStyle);
-                        doc.insertString(doc.getLength(), msg + "\n", null);
+                        // After sending, force a fresh reload from DB to avoid duplicates
+                        reloadConversation(otherStyle, userStyle);
                     }
                 } catch (Exception ex) {}
                 messageField.setText("");
@@ -144,11 +168,81 @@ public class ChatsPanel extends JPanel {
             mainWindow.showScreen("swipe");
         });
 
-        // Refresh matches when panel gains focus
+        // Refresh matches and start/stop polling when panel is shown/hidden
         this.addHierarchyListener(ev -> {
-            if ((ev.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && this.isShowing()) {
-                loadMatches.run();
+            if ((ev.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0) {
+                if (this.isShowing()) {
+                    loadMatches.run();
+                    startPolling(otherStyle, userStyle);
+                } else {
+                    stopPolling();
+                }
             }
         });
+    }
+
+    private void reloadConversation(javax.swing.text.Style otherStyle, javax.swing.text.Style userStyle) {
+        int idx = chatList.getSelectedIndex();
+        if (idx < 0) return;
+        Integer otherId = chatIdModel.get(idx);
+        selectedOtherId = otherId;
+        conversationArea.setText("");
+        lastTs = 0L;
+        try {
+            Integer uid = mainWindow.getLoggedInUserId();
+            if (uid == null) return;
+            List<Map<String,Object>> msgs = Database.getMessagesBetween(uid, otherId);
+            for (Map<String,Object> m : msgs) {
+                boolean fromOther = ((Integer)m.get("from")).intValue() == otherId;
+                String who = fromOther ? (chatList.getSelectedValue()+": ") : "You: ";
+                doc.insertString(doc.getLength(), who, fromOther ? otherStyle : userStyle);
+                doc.insertString(doc.getLength(), (String)m.get("body") + "\n", null);
+                if (m.get("ts") != null) {
+                    long ts = ((Number)m.get("ts")).longValue();
+                    if (ts > lastTs) lastTs = ts;
+                }
+            }
+            conversationArea.setCaretPosition(doc.getLength());
+            lastSeenPerUser.put(selectedOtherId, lastTs);
+        } catch (Exception ex) {}
+    }
+
+    private void startPolling(javax.swing.text.Style otherStyle, javax.swing.text.Style userStyle) {
+        if (pollTimer != null && pollTimer.isRunning()) return;
+        pollTimer = new javax.swing.Timer(1500, evt -> pollOnce(otherStyle, userStyle));
+        pollTimer.setRepeats(true);
+        pollTimer.start();
+    }
+
+    private void stopPolling() {
+        if (pollTimer != null) {
+            pollTimer.stop();
+        }
+    }
+
+    private void pollOnce(javax.swing.text.Style otherStyle, javax.swing.text.Style userStyle) {
+        if (selectedOtherId == null) return;
+        try {
+            Integer uid = mainWindow.getLoggedInUserId();
+            if (uid == null) return;
+            List<Map<String,Object>> msgs = Database.getMessagesBetween(uid, selectedOtherId);
+            boolean appended = false;
+            for (Map<String,Object> m : msgs) {
+                long ts = m.get("ts") == null ? 0L : ((Number)m.get("ts")).longValue();
+                if (ts <= lastTs) continue;
+                boolean fromOther = ((Integer)m.get("from")).intValue() == selectedOtherId;
+                String who = fromOther ? (chatList.getSelectedValue()+": ") : "You: ";
+                try {
+                    doc.insertString(doc.getLength(), who, fromOther ? otherStyle : userStyle);
+                    doc.insertString(doc.getLength(), (String)m.get("body") + "\n", null);
+                    appended = true;
+                } catch (Exception ignore) {}
+                if (ts > lastTs) lastTs = ts;
+            }
+            if (appended) {
+                conversationArea.setCaretPosition(doc.getLength());
+                lastSeenPerUser.put(selectedOtherId, lastTs);
+            }
+        } catch (Exception ex) {}
     }
 }

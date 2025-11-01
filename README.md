@@ -29,7 +29,6 @@
    java -cp ".;lib/sqlite-jdbc.jar;lib/slf4j-api.jar;lib/slf4j-simple.jar" MainWindow
    ```
    The app will create a local SQLite file `campuscupid.db` in the project folder.
-   On first run (local mode), it auto-seeds ~60 demo users so the Swipe tab has people to show.
 
 ---
 
@@ -46,6 +45,9 @@ This repo includes a tiny HTTP server so multiple laptops can register, swipe, m
    - You can also force a port explicitly:
      - Via system property: `java -Dport=8099 -cp ".;lib\sqlite-jdbc.jar;lib\slf4j-api.jar;lib\slf4j-simple.jar" ServerMain`
      - Or environment variable (before running): `set PORT=8099`
+   - Optional demo data: seed ~60 users only if requested:
+      - `java -Dseed=true -cp ".;lib\sqlite-jdbc.jar;lib\slf4j-api.jar;lib\slf4j-simple.jar" ServerMain`
+      - Or set `SEED=1` before running
 
 2) On EVERY laptop (including the host), start the app and enter the server URL when prompted:
    - Example on host: `http://localhost:8080` (or whatever the server printed)

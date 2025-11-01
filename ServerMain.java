@@ -15,7 +15,10 @@ public class ServerMain {
     public static void main(String[] args) throws Exception {
         Database.setRemoteBaseUrl(null); // ensure server uses local DB
     Database.init();
-    Database.seedDemoUsers();
+    // Optional: seed demo users only if explicitly requested via -Dseed=true or SEED=1
+    if (parseSeedPref()) {
+        Database.seedDemoUsers();
+    }
 
         // Determine a port: prefer -Dport, then PORT env, then try 8080..8090
         int desired = parsePortPref();
@@ -227,5 +230,14 @@ public class ServerMain {
         p = parseInt(System.getenv("PORT"));
         if (p != null && p > 0 && p < 65536) return p;
         return -1;
+    }
+
+    static boolean parseSeedPref() {
+        String prop = System.getProperty("seed");
+        if (prop != null) {
+            return prop.equalsIgnoreCase("true") || prop.equals("1") || prop.equalsIgnoreCase("yes");
+        }
+        String env = System.getenv("SEED");
+        return env != null && (env.equalsIgnoreCase("true") || env.equals("1") || env.equalsIgnoreCase("yes"));
     }
 }
