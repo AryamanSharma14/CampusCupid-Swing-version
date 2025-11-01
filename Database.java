@@ -38,6 +38,7 @@ public class Database {
             "  interests TEXT,\n" +
             "  hobbies TEXT,\n" +
             "  occupation TEXT,\n" +
+            "  photo_url TEXT,\n" +
             "  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE\n" +
             ")");
 
@@ -57,6 +58,9 @@ public class Database {
                 }
                 if (!cols.contains("age")) {
                     st.execute("ALTER TABLE profiles ADD COLUMN age INTEGER");
+                }
+                if (!cols.contains("photo_url")) {
+                    st.execute("ALTER TABLE profiles ADD COLUMN photo_url TEXT");
                 }
             } catch (SQLException ignore) {}
 
@@ -170,7 +174,7 @@ public class Database {
         return null;
     }
 
-    public static void upsertProfile(int userId, String name, String gender, Integer age, String bio, String interests, String hobbies, String occupation) {
+    public static void upsertProfile(int userId, String name, String gender, Integer age, String bio, String interests, String hobbies, String occupation, String photoUrl) {
         if (REMOTE_BASE_URL != null) {
             try {
                 httpPostForm(REMOTE_BASE_URL + "/api/profile", mapOf(
@@ -181,14 +185,15 @@ public class Database {
                         "bio", orEmpty(bio),
                         "interests", orEmpty(interests),
                         "hobbies", orEmpty(hobbies),
-                        "occupation", orEmpty(occupation)
+                        "occupation", orEmpty(occupation),
+                        "photoUrl", orEmpty(photoUrl)
                 ));
                 return;
             } catch (Exception e) { /* fall through */ }
         }
         String sqlUser = "UPDATE users SET name=? WHERE id=?";
-        String sql = "INSERT INTO profiles(user_id, name, gender, age, bio, interests, hobbies, occupation) VALUES(?,?,?,?,?,?,?,?)\n" +
-                "ON CONFLICT(user_id) DO UPDATE SET name=excluded.name, gender=excluded.gender, age=excluded.age, bio=excluded.bio, interests=excluded.interests, hobbies=excluded.hobbies, occupation=excluded.occupation";
+        String sql = "INSERT INTO profiles(user_id, name, gender, age, bio, interests, hobbies, occupation, photo_url) VALUES(?,?,?,?,?,?,?,?,?)\n" +
+                "ON CONFLICT(user_id) DO UPDATE SET name=excluded.name, gender=excluded.gender, age=excluded.age, bio=excluded.bio, interests=excluded.interests, hobbies=excluded.hobbies, occupation=excluded.occupation, photo_url=excluded.photo_url";
         try (Connection conn = getConnection()) {
             conn.setAutoCommit(false);
             try (PreparedStatement upUser = conn.prepareStatement(sqlUser); PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -204,6 +209,7 @@ public class Database {
                 ps.setString(6, interests);
                 ps.setString(7, hobbies);
                 ps.setString(8, occupation);
+                ps.setString(9, photoUrl);
                 ps.executeUpdate();
                 conn.commit();
             } catch (SQLException e) {
@@ -219,14 +225,16 @@ public class Database {
 
     public static ResultSet listCandidatesRaw(Connection conn, int userId, String genderPref, Integer agePref, String interestsPref) throws SQLException {
         StringBuilder sb = new StringBuilder();
-        sb.append("SELECT u.id, COALESCE(p.name,u.name) AS name, p.gender, p.age, p.interests, p.bio " +
-                  "FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id<>? ");
+        sb.append("SELECT u.id, COALESCE(p.name,u.name) AS name, p.gender, p.age, p.interests, p.bio, p.photo_url " +
+                  "FROM users u LEFT JOIN profiles p ON p.user_id=u.id " +
+                  "WHERE u.id<>? AND NOT EXISTS (SELECT 1 FROM swipes s WHERE s.user_id=? AND s.target_user_id=u.id) ");
         if (genderPref != null && !"Any".equalsIgnoreCase(genderPref)) {
             sb.append(" AND LOWER(p.gender)=LOWER(?)");
         }
         // Fetch; we'll filter age/interests in code for simplicity
         PreparedStatement ps = conn.prepareStatement(sb.toString());
         int idx = 1;
+        ps.setInt(idx++, userId);
         ps.setInt(idx++, userId);
         if (genderPref != null && !"Any".equalsIgnoreCase(genderPref)) {
             ps.setString(idx++, genderPref);
@@ -252,6 +260,7 @@ public class Database {
                         m.put("age", parts[3].isEmpty()? null : Integer.parseInt(parts[3]));
                         m.put("interests", parts[4]);
                         m.put("bio", parts[5]);
+                        m.put("photoUrl", parts.length>6? parts[6] : "");
                         out.add(m);
                     }
                 }
@@ -273,6 +282,7 @@ public class Database {
                     m.put("age", age);
                     m.put("interests", interests);
                     m.put("bio", rs.getString("bio"));
+                    m.put("photoUrl", rs.getString("photo_url"));
                     out.add(m);
                 }
             }

@@ -29,7 +29,7 @@ public class SwipePanel extends JPanel {
         cardPanel.setBackground(lightPurple);
         cardPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        imageLabel = new JLabel();
+    imageLabel = new JLabel();
         imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
         imageLabel.setPreferredSize(new Dimension(100,100));
         imageLabel.setMaximumSize(new Dimension(100,100));
@@ -156,7 +156,7 @@ public class SwipePanel extends JPanel {
                 age == null ? 0 : age,
                 (String) r.get("interests"),
                 (String) r.get("bio"),
-                "🧑"
+                (String) r.get("photoUrl")
             ));
         }
         currentIndex = 0;
@@ -166,7 +166,21 @@ public class SwipePanel extends JPanel {
         if (currentIndex < candidates.size()) {
             Candidate c = candidates.get(currentIndex);
             nameLabel.setText(c.name + " (" + c.gender + ", Age: " + c.age + ")");
-            imageLabel.setText(c.image);
+            if (c.image != null && !c.image.isBlank()) {
+                try {
+                    java.net.URL u = new java.net.URL(c.image);
+                    ImageIcon icon = new ImageIcon(u);
+                    Image img = icon.getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH);
+                    imageLabel.setIcon(new ImageIcon(img));
+                    imageLabel.setText("");
+                } catch(Exception ex) {
+                    imageLabel.setIcon(null);
+                    imageLabel.setText("🧑");
+                }
+            } else {
+                imageLabel.setIcon(null);
+                imageLabel.setText("🧑");
+            }
             bioArea.setText(c.bio + "\nInterests: " + c.interests);
             matchLabel.setText("");
             likeButton.setEnabled(true);

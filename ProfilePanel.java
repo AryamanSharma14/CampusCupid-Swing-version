@@ -15,7 +15,7 @@ public class ProfilePanel extends JPanel {
         profileCard.setBorder(BorderFactory.createEmptyBorder(30, 40, 30, 40));
         profileCard.setBackground(lightPurple);
 
-        JLabel avatar = new JLabel();
+    JLabel avatar = new JLabel();
         avatar.setPreferredSize(new Dimension(100,100));
         avatar.setMaximumSize(new Dimension(100,100));
         avatar.setOpaque(true);
@@ -53,6 +53,14 @@ public class ProfilePanel extends JPanel {
     ageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
     JSpinner ageSpinner = new JSpinner(new SpinnerNumberModel(21, 18, 60, 1));
     ageSpinner.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+
+    JLabel photoLabel = new JLabel("Photo URL:");
+    photoLabel.setFont(new Font("Arial", Font.PLAIN, 16));
+    photoLabel.setForeground(purple);
+    photoLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+    JTextField photoField = new JTextField(20);
+    photoField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+    photoField.setHorizontalAlignment(JTextField.CENTER);
 
     JLabel bioLabel = new JLabel("Bio:");
     bioLabel.setFont(new Font("Arial", Font.PLAIN, 16));
@@ -120,6 +128,9 @@ public class ProfilePanel extends JPanel {
     profileCard.add(ageLabel);
     profileCard.add(ageSpinner);
     profileCard.add(Box.createVerticalStrut(10));
+    profileCard.add(photoLabel);
+    profileCard.add(photoField);
+    profileCard.add(Box.createVerticalStrut(10));
     profileCard.add(bioLabel);
     profileCard.add(bioArea);
     profileCard.add(Box.createVerticalStrut(10));
@@ -152,7 +163,21 @@ public class ProfilePanel extends JPanel {
                 Integer uid = mainWindow.getLoggedInUserId();
                 if (uid != null) {
                     Integer age = (Integer) ageSpinner.getValue();
-                    Database.upsertProfile(uid, name, (String)genderCombo.getSelectedItem(), age, bio, interestsField.getText().trim(), hobbiesField.getText().trim(), occupationField.getText().trim());
+                    Database.upsertProfile(uid, name, (String)genderCombo.getSelectedItem(), age, bio, interestsField.getText().trim(), hobbiesField.getText().trim(), occupationField.getText().trim(), photoField.getText().trim());
+                    // Try to preview avatar
+                    String url = photoField.getText().trim();
+                    if (!url.isEmpty()) {
+                        try {
+                            java.net.URL u = new java.net.URL(url);
+                            ImageIcon icon = new ImageIcon(u);
+                            Image img = icon.getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH);
+                            avatar.setText("");
+                            avatar.setIcon(new ImageIcon(img));
+                        } catch(Exception ex2) {
+                            avatar.setIcon(null);
+                            avatar.setText("👤");
+                        }
+                    }
                 }
                 messageLabel.setText("Profile saved! Go to Preferences");
                 messageLabel.setForeground(new Color(0, 153, 51));

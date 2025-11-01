@@ -20,7 +20,7 @@ public class ServerMain {
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         server.createContext("/api/register", new RegisterHandler());
         server.createContext("/api/login", new LoginHandler());
-        server.createContext("/api/profile", new ProfileHandler());
+    server.createContext("/api/profile", new ProfileHandler());
         server.createContext("/api/preferences", new PreferencesHandler());
         server.createContext("/api/candidates", new CandidatesHandler());
         server.createContext("/api/swipe", new SwipeHandler());
@@ -50,9 +50,10 @@ public class ServerMain {
             Map<String,String> f = readForm(ex);
             Integer uid = parseInt(f.get("userId"));
             Integer age = parseInt(f.get("age"));
+            // Accept either explicit userId (legacy) or rely on provided userId
             if (uid != null) {
-                Database.upsertProfile(uid, f.get("name"), f.get("gender"), age,
-                        f.get("bio"), f.get("interests"), f.get("hobbies"), f.get("occupation"));
+        Database.upsertProfile(uid, f.get("name"), f.get("gender"), age,
+            f.get("bio"), f.get("interests"), f.get("hobbies"), f.get("occupation"), f.getOrDefault("photoUrl", ""));
                 write200(ex, "OK");
             } else write400(ex, "Missing userId");
         }
@@ -84,7 +85,8 @@ public class ServerMain {
                   .append(nullToEmpty((String)r.get("gender"))).append('|')
                   .append(r.get("age")==null?"":String.valueOf(r.get("age"))).append('|')
                   .append(nullToEmpty((String)r.get("interests"))).append('|')
-                  .append(nullToEmpty((String)r.get("bio"))).append('\n');
+                  .append(nullToEmpty((String)r.get("bio"))).append('|')
+                  .append(nullToEmpty((String)r.get("photoUrl"))).append('\n');
             }
             write200(ex, sb.toString());
         }
