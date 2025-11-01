@@ -14,7 +14,8 @@ import java.util.Map;
 public class ServerMain {
     public static void main(String[] args) throws Exception {
         Database.setRemoteBaseUrl(null); // ensure server uses local DB
-        Database.init();
+    Database.init();
+    Database.seedDemoUsers();
 
         int port = 8080;
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);

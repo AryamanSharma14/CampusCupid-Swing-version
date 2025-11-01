@@ -5,6 +5,59 @@ import java.util.Map;
 import java.security.MessageDigest;
 
 public class Database {
+    // Seed lots of demo users if DB is empty
+    public static void seedDemoUsers() {
+        try (Connection conn = getConnection(); Statement st = conn.createStatement()) {
+            ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM users");
+            if (rs.next() && rs.getInt(1) > 0) return; // Already has users
+        } catch (Exception ignore) { return; }
+
+        String[] femaleFirst = {"Alice","Carol","Emma","Grace","Ivy","Mia","Nina","Olivia","Paula","Queenie","Riya","Sara","Tina","Uma","Veda","Wendy","Xena","Yara","Zara","Bella","Chloe","Diana","Eva","Fiona","Hannah","Isla","Jade","Kira","Luna","Mila"};
+        String[] maleFirst   = {"Bob","Dave","Frank","Harry","Jack","Liam","Noah","Owen","Paul","Quinn","Ryan","Sam","Tom","Uday","Vikram","Will","Xavier","Yash","Zane","Aarav","Arjun","Kabir","Rohan","Ishan","Aditya","Anish","Dev","Kunal","Neil","Varun"};
+        String[] lastNames   = {"Sharma","Patel","Verma","Gupta","Rao","Iyer","Singh","Khan","Das","Ghosh","Agarwal","Kapoor","Bose","Kulkarni","Mehta","Naidu","Saxena","Chawla","Bhatt","Bajaj"};
+        String[] interests   = {"music","reading","sports","tech","travel","movies","gaming","art","coffee","coding","fitness","food","dancing","nature","photography","yoga","books","memes","cricket","football"};
+        String[] hobbies     = {"painting","football","dancing","gaming","cooking","reading","hiking","gym","photography","yoga"};
+        String[] occupations = {"Student","Engineer","Designer","Developer","Artist","Trainer","Chef","Biologist","Athlete","Researcher"};
+
+        int count = 0;
+        for (int i = 0; i < 30; i++) {
+            String first = femaleFirst[i % femaleFirst.length];
+            String last  = lastNames[(i * 3) % lastNames.length];
+            String name  = first + " " + last;
+            String email = (first + "." + last + (i+1) + "@srmist.edu.in").toLowerCase();
+            int age = 18 + (i % 10);
+            String bio = "Hi, I'm " + first + "!";
+            String ints = interests[i % interests.length] + "," + interests[(i+5) % interests.length];
+            String hob  = hobbies[i % hobbies.length];
+            String occ  = occupations[i % occupations.length];
+            String photo = "https://randomuser.me/api/portraits/women/" + ((i % 80) + 1) + ".jpg";
+            registerUser(email, "password123");
+            Integer id = getUserIdByEmail(email);
+            if (id != null) {
+                upsertProfile(id, name, "Female", age, bio, ints, hob, occ, photo);
+                count++;
+            }
+        }
+        for (int i = 0; i < 30; i++) {
+            String first = maleFirst[i % maleFirst.length];
+            String last  = lastNames[(i * 5) % lastNames.length];
+            String name  = first + " " + last;
+            String email = (first + "." + last + (i+31) + "@srmist.edu.in").toLowerCase();
+            int age = 19 + (i % 10);
+            String bio = "Hey, I'm " + first + ".";
+            String ints = interests[(i+2) % interests.length] + "," + interests[(i+7) % interests.length];
+            String hob  = hobbies[(i+3) % hobbies.length];
+            String occ  = occupations[(i+4) % occupations.length];
+            String photo = "https://randomuser.me/api/portraits/men/" + ((i % 80) + 1) + ".jpg";
+            registerUser(email, "password123");
+            Integer id = getUserIdByEmail(email);
+            if (id != null) {
+                upsertProfile(id, name, "Male", age, bio, ints, hob, occ, photo);
+                count++;
+            }
+        }
+        System.out.println("Seeded demo users: " + count);
+    }
     private static final String DB_URL = "jdbc:sqlite:campuscupid.db";
     private static final String PASS_SALT = "CampusCupidSalt_v1"; // Note: for demo only; use per-user salts + bcrypt/argon2 in production
     private static String REMOTE_BASE_URL = null; // When set, use HTTP instead of local DB
