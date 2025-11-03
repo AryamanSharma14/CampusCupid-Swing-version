@@ -73,38 +73,47 @@ public class RegistrationPanel extends JPanel {
         background.add(top, BorderLayout.NORTH);
 
         // Scrollable centered form card
-        JPanel card = new JPanel(){ @Override protected void paintComponent(Graphics g){ super.paintComponent(g); Graphics2D g2=(Graphics2D)g.create(); // shadow
-            int w=getWidth(), h=getHeight(); for(int i=8;i>=1;i--){ g2.setColor(new Color(0,0,0,10)); g2.fillRoundRect(4, 4+(8-i), w-8, h-8, 20,20);} g2.setColor(Color.WHITE); g2.fillRoundRect(0,0,w-1,h-1,20,20); g2.dispose(); } };
-        card.setOpaque(false); card.setLayout(new GridBagLayout()); card.setBorder(BorderFactory.createEmptyBorder(40,40,40,40));
-        card.setPreferredSize(new Dimension(700, 10));
+        JPanel card = new JPanel(){ @Override protected void paintComponent(Graphics g){ super.paintComponent(g); Graphics2D g2=(Graphics2D)g.create(); int w=getWidth(), h=getHeight(); for(int i=8;i>=1;i--){ g2.setColor(new Color(0,0,0,10)); g2.fillRoundRect(4, 4+(8-i), w-8, h-8, 20,20);} g2.setColor(Color.WHITE); g2.fillRoundRect(0,0,w-1,h-1,20,20); g2.dispose(); } };
+    card.setOpaque(false); card.setLayout(new GridBagLayout()); card.setBorder(BorderFactory.createEmptyBorder(40,40,40,40));
+    // Let content decide height; only guide width
+    card.setMaximumSize(new Dimension(900, Integer.MAX_VALUE));
 
         // Header section inside card
-        GridBagConstraints gc = new GridBagConstraints(); gc.gridx=0; gc.gridy=0; gc.anchor=GridBagConstraints.WEST; gc.fill=GridBagConstraints.HORIZONTAL; gc.weightx=1;
-        JLabel header = new JLabel("CampusCupid Registration"); header.setFont(new Font("Segoe UI", Font.BOLD, 26)); header.setForeground(Color.decode("#7B2CBF")); card.add(header, gc);
-        gc.gridy++; JLabel subtitle = new JLabel("Join thousands of students finding connections on campus"); subtitle.setFont(new Font("Segoe UI", Font.ITALIC, 13)); subtitle.setForeground(Color.decode("#9D4EDD")); card.add(subtitle, gc);
-    gc.gridy++; JComponent underline = new JComponent(){ @Override protected void paintComponent(Graphics g){ Graphics2D g2=(Graphics2D)g.create(); int x=0; int y=getHeight()/2; g2.setPaint(new GradientPaint(x,y, Color.decode("#FF69B4"), x+280, y, Color.decode("#9D4EDD"))); g2.fillRect(0, y-2, 280, 3); g2.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 14)); g2.drawString("💜", 288, y+4); g2.dispose(); } @Override public Dimension getPreferredSize(){ return new Dimension(300, 12);} }; card.add(underline, gc);
+    GridBagConstraints gc = new GridBagConstraints(); gc.gridx=0; gc.gridy=0; gc.anchor=GridBagConstraints.WEST; gc.fill=GridBagConstraints.BOTH; gc.weightx=1; gc.weighty=0;
+        // Add all fields to a vertical box and add that as a single GridBag cell
+        Box vbox = Box.createVerticalBox();
+        JLabel header = new JLabel("CampusCupid Registration"); header.setFont(new Font("Segoe UI", Font.BOLD, 26)); header.setForeground(Color.decode("#7B2CBF")); vbox.add(header);
+        vbox.add(Box.createVerticalStrut(4));
+        JLabel subtitle = new JLabel("Join thousands of students finding connections on campus"); subtitle.setFont(new Font("Segoe UI", Font.ITALIC, 13)); subtitle.setForeground(Color.decode("#9D4EDD")); vbox.add(subtitle);
+        vbox.add(Box.createVerticalStrut(4));
+        JComponent underline = new JComponent(){ @Override protected void paintComponent(Graphics g){ Graphics2D g2=(Graphics2D)g.create(); int x=0; int y=getHeight()/2; g2.setPaint(new GradientPaint(x,y, Color.decode("#FF69B4"), x+280, y, Color.decode("#9D4EDD"))); g2.fillRect(0, y-2, 280, 3); g2.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 14)); g2.drawString("💜", 288, y+4); g2.dispose(); } @Override public Dimension getPreferredSize(){ return new Dimension(300, 12);} }; vbox.add(underline);
+        vbox.add(Box.createVerticalStrut(20));
 
-        // Form fields (basic subset per spec; can extend similarly)
-        gc.gridy++; gc.insets=new Insets(20,0,5,0); JLabel nameLbl = new JLabel("Full Name *"); nameLbl.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13)); nameLbl.setForeground(Color.decode("#5A189A")); card.add(nameLbl, gc);
-        gc.gridy++; JTextField name = new JTextField(); name.setPreferredSize(new Dimension(620,50)); name.setBorder(BorderFactory.createEmptyBorder(0,15,0,15)); name.setFont(new Font("Segoe UI", Font.PLAIN, 13)); name.setForeground(Color.decode("#3C096C")); card.add(roundField(name), gc);
+        JLabel nameLbl = new JLabel("Full Name *"); nameLbl.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13)); nameLbl.setForeground(Color.decode("#5A189A")); vbox.add(nameLbl);
+        JTextField name = new JTextField(); name.setPreferredSize(new Dimension(620,50)); name.setBorder(BorderFactory.createEmptyBorder(0,15,0,15)); name.setFont(new Font("Segoe UI", Font.PLAIN, 13)); name.setForeground(Color.decode("#3C096C")); vbox.add(roundField(name));
+        vbox.add(Box.createVerticalStrut(15));
 
-        gc.gridy++; gc.insets=new Insets(15,0,2,0); JLabel emLbl = new JLabel("SRM Email Address *"); emLbl.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13)); emLbl.setForeground(Color.decode("#5A189A")); card.add(emLbl, gc);
-        gc.gridy++; JPanel emailWrap = new JPanel(new BorderLayout()); emailWrap.setOpaque(false); JLabel mailIcon = new JLabel("  📧 "); mailIcon.setForeground(Color.decode("#5A189A")); JTextField email = new JTextField(); email.setPreferredSize(new Dimension(620,50)); email.setBorder(BorderFactory.createEmptyBorder(0,35,0,40)); email.setFont(new Font("Segoe UI", Font.PLAIN, 13)); email.setForeground(Color.decode("#3C096C")); emailWrap.add(mailIcon, BorderLayout.WEST); emailWrap.add(email, BorderLayout.CENTER); JLabel emailOk = new JLabel(""); emailOk.setForeground(new Color(0x3B,0xB7,0x89)); emailWrap.add(emailOk, BorderLayout.EAST); card.add(roundField(emailWrap), gc);
+        JLabel emLbl = new JLabel("SRM Email Address *"); emLbl.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13)); emLbl.setForeground(Color.decode("#5A189A")); vbox.add(emLbl);
+        JPanel emailWrap = new JPanel(new BorderLayout()); emailWrap.setOpaque(false); JLabel mailIcon = new JLabel("  📧 "); mailIcon.setForeground(Color.decode("#5A189A")); JTextField email = new JTextField(); email.setPreferredSize(new Dimension(620,50)); email.setBorder(BorderFactory.createEmptyBorder(0,35,0,40)); email.setFont(new Font("Segoe UI", Font.PLAIN, 13)); email.setForeground(Color.decode("#3C096C")); emailWrap.add(mailIcon, BorderLayout.WEST); emailWrap.add(email, BorderLayout.CENTER); JLabel emailOk = new JLabel(""); emailOk.setForeground(new Color(0x3B,0xB7,0x89)); emailWrap.add(emailOk, BorderLayout.EAST); vbox.add(roundField(emailWrap));
+        vbox.add(Box.createVerticalStrut(15));
 
-        gc.gridy++; gc.insets=new Insets(15,0,2,0); JLabel pwLbl = new JLabel("Create Password *"); pwLbl.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13)); pwLbl.setForeground(Color.decode("#5A189A")); card.add(pwLbl, gc);
-        gc.gridy++; JPanel pwRow = new JPanel(new BorderLayout()); pwRow.setOpaque(false); JLabel lock = new JLabel("  🔒 "); JPasswordField pw = new JPasswordField(); pw.setBorder(BorderFactory.createEmptyBorder(0,35,0,50)); pw.setFont(new Font("Segoe UI", Font.PLAIN, 13)); JLabel show = new JLabel(" 👁️ "); show.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)); show.setToolTipText("Show/Hide"); show.addMouseListener(new java.awt.event.MouseAdapter(){ boolean vis=false; @Override public void mouseClicked(java.awt.event.MouseEvent e){ vis=!vis; pw.setEchoChar(vis?(char)0:'•'); } }); JPanel rightIcons=new JPanel(new FlowLayout(FlowLayout.RIGHT,10,10)); rightIcons.setOpaque(false); rightIcons.add(show); pwRow.add(lock, BorderLayout.WEST); pwRow.add(pw, BorderLayout.CENTER); pwRow.add(rightIcons, BorderLayout.EAST); card.add(roundField(pwRow), gc);
+        JLabel pwLbl = new JLabel("Create Password *"); pwLbl.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13)); pwLbl.setForeground(Color.decode("#5A189A")); vbox.add(pwLbl);
+        JPanel pwRow = new JPanel(new BorderLayout()); pwRow.setOpaque(false); JLabel lock = new JLabel("  🔒 "); JPasswordField pw = new JPasswordField(); pw.setBorder(BorderFactory.createEmptyBorder(0,35,0,50)); pw.setFont(new Font("Segoe UI", Font.PLAIN, 13)); JLabel show = new JLabel(" 👁️ "); show.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)); show.setToolTipText("Show/Hide"); show.addMouseListener(new java.awt.event.MouseAdapter(){ boolean vis=false; @Override public void mouseClicked(java.awt.event.MouseEvent e){ vis=!vis; pw.setEchoChar(vis?(char)0:'•'); } }); JPanel rightIcons=new JPanel(new FlowLayout(FlowLayout.RIGHT,10,10)); rightIcons.setOpaque(false); rightIcons.add(show); pwRow.add(lock, BorderLayout.WEST); pwRow.add(pw, BorderLayout.CENTER); pwRow.add(rightIcons, BorderLayout.EAST); vbox.add(roundField(pwRow));
+        vbox.add(Box.createVerticalStrut(15));
 
-        gc.gridy++; gc.insets=new Insets(15,0,2,0); JLabel cpwLbl = new JLabel("Confirm Password *"); cpwLbl.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13)); cpwLbl.setForeground(Color.decode("#5A189A")); card.add(cpwLbl, gc);
-        gc.gridy++; JPasswordField cpw = new JPasswordField(); cpw.setBorder(BorderFactory.createEmptyBorder(0,15,0,40)); card.add(roundField(cpw), gc);
+        JLabel cpwLbl = new JLabel("Confirm Password *"); cpwLbl.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13)); cpwLbl.setForeground(Color.decode("#5A189A")); vbox.add(cpwLbl);
+        JPasswordField cpw = new JPasswordField(); cpw.setBorder(BorderFactory.createEmptyBorder(0,15,0,40)); vbox.add(roundField(cpw));
+        vbox.add(Box.createVerticalStrut(30));
 
-        // Actions
-        gc.gridy++; gc.insets=new Insets(30,0,0,0); JPanel actions = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0)); actions.setOpaque(false);
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0)); actions.setOpaque(false);
         JButton register = new JButton("Register & Continue ✓"); stylePrimary(register); actions.add(register);
         JButton backLogin = new JButton("\u2190 Back to Login"); styleSecondary(backLogin); actions.add(backLogin);
-        card.add(actions, gc);
+        vbox.add(actions);
+
+    gc.gridy = 0; gc.weighty = 0; card.add(vbox, gc);
 
         // Center and make scrollable
-        JPanel wrap = new JPanel(new GridBagLayout()); wrap.setOpaque(false); GridBagConstraints cc=new GridBagConstraints(); cc.gridx=0; cc.gridy=0; cc.weightx=1; cc.anchor=GridBagConstraints.NORTH; wrap.add(card, cc);
+    JPanel wrap = new JPanel(new GridBagLayout()); wrap.setOpaque(false); GridBagConstraints cc=new GridBagConstraints(); cc.gridx=0; cc.gridy=0; cc.weightx=1; cc.anchor=GridBagConstraints.NORTH; cc.fill=GridBagConstraints.NONE; wrap.add(card, cc);
         JScrollPane sc = new JScrollPane(wrap, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER); sc.setBorder(null); sc.getVerticalScrollBar().setUI(new ProfilePanel.PurpleScrollbarUI()); sc.setOpaque(false); sc.getViewport().setOpaque(false);
         background.add(sc, BorderLayout.CENTER);
 
