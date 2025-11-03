@@ -20,7 +20,8 @@ public class ServerMain {
         Database.seedDemoUsers();
     }
 
-        // Determine a port: prefer -Dport, then PORT env, then try 8080..8090
+        // Determine a port: prefer -Dport / -Dcampuscupid.port, then PORT/CAMPUSCUPID_PORT env,
+        // else try 8082 first (your preferred default), then 8080..8090 as fallback
         int desired = parsePortPref();
         HttpServer server = null;
         int port = desired;
@@ -28,18 +29,19 @@ public class ServerMain {
             try {
                 server = HttpServer.create(new InetSocketAddress(port), 0);
             } catch (java.net.BindException be) {
-                System.out.println("Port " + port + " busy, trying fallback range 8080-8090...");
+                System.out.println("Port " + port + " busy, trying fallback range (8082, then 8080-8090)...");
                 server = null; // will fall through to range
             }
         }
         if (server == null) {
-            for (int p = 8080; p <= 8090; p++) {
+            int[] candidates = buildPortCandidates();
+            for (int p : candidates) {
                 try {
                     server = HttpServer.create(new InetSocketAddress(p), 0);
                     port = p;
                     break;
                 } catch (java.net.BindException be) {
-                    continue;
+                    // try next
                 }
             }
         }
@@ -227,9 +229,24 @@ public class ServerMain {
     static int parsePortPref() {
         Integer p = parseInt(System.getProperty("port"));
         if (p != null && p > 0 && p < 65536) return p;
+        p = parseInt(System.getProperty("campuscupid.port"));
+        if (p != null && p > 0 && p < 65536) return p;
         p = parseInt(System.getenv("PORT"));
         if (p != null && p > 0 && p < 65536) return p;
+        p = parseInt(System.getenv("CAMPUSCUPID_PORT"));
+        if (p != null && p > 0 && p < 65536) return p;
         return -1;
+    }
+
+    static int[] buildPortCandidates() {
+        // Prefer 8082 first, then 8080..8090 excluding 8082
+        java.util.List<Integer> list = new java.util.ArrayList<>();
+        list.add(8082);
+        for (int p = 8080; p <= 8090; p++) {
+            if (p == 8082) continue;
+            list.add(p);
+        }
+        return list.stream().mapToInt(Integer::intValue).toArray();
     }
 
     static boolean parseSeedPref() {

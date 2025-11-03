@@ -5,11 +5,14 @@ import java.util.Map;
 import java.security.MessageDigest;
 
 public class Database {
-    // Seed lots of demo users if DB is empty
+    // Seed lots of demo users if DB is sparse (helps swipe screen have content)
     public static void seedDemoUsers() {
         try (Connection conn = getConnection(); Statement st = conn.createStatement()) {
             ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM users");
-            if (rs.next() && rs.getInt(1) > 0) return; // Already has users
+            if (rs.next()) {
+                int count = rs.getInt(1);
+                if (count >= 20) return; // Enough users already
+            }
         } catch (Exception ignore) { return; }
 
         String[] femaleFirst = {"Alice","Carol","Emma","Grace","Ivy","Mia","Nina","Olivia","Paula","Queenie","Riya","Sara","Tina","Uma","Veda","Wendy","Xena","Yara","Zara","Bella","Chloe","Diana","Eva","Fiona","Hannah","Isla","Jade","Kira","Luna","Mila"};
@@ -488,6 +491,34 @@ public class Database {
             }
         } catch (SQLException e) { e.printStackTrace(); }
         return out;
+    }
+
+    // Fast helper to fetch only the most recent message between two users
+    public static Map<String, Object> getLastMessageBetween(int a, int b) {
+        if (REMOTE_BASE_URL != null) {
+            // Best-effort fallback for remote: reuse full list and pick last
+            java.util.List<Map<String, Object>> all = getMessagesBetween(a, b);
+            if (all.isEmpty()) return null;
+            return all.get(all.size() - 1);
+        }
+        String sql = "SELECT from_user_id, to_user_id, body, created_at FROM messages WHERE (from_user_id=? AND to_user_id=?) OR (from_user_id=? AND to_user_id=?) ORDER BY created_at DESC LIMIT 1";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, a);
+            ps.setInt(2, b);
+            ps.setInt(3, b);
+            ps.setInt(4, a);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    Map<String, Object> m = new java.util.HashMap<>();
+                    m.put("from", rs.getInt("from_user_id"));
+                    m.put("to", rs.getInt("to_user_id"));
+                    m.put("body", rs.getString("body"));
+                    m.put("ts", rs.getLong("created_at"));
+                    return m;
+                }
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return null;
     }
 
     public static void sendMessage(int from, int to, String body) {

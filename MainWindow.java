@@ -39,7 +39,9 @@ public class MainWindow extends JFrame {
     public MainWindow() {
         setTitle("CampusCupid - Java Swing");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(500, 600);
+        // Increase default size and set a minimum to fit redesigned screens
+        setSize(1000, 720);
+        setMinimumSize(new Dimension(1000, 750));
         setLocationRelativeTo(null);
 
         // Improve Look & Feel (Nimbus) if available
@@ -52,13 +54,17 @@ public class MainWindow extends JFrame {
             }
         } catch (Exception ignored) {}
 
-        // Ask for optional server URL for multi-laptop demo
-        String url = JOptionPane.showInputDialog(this, "Server URL (leave blank for local DB):", "http://localhost:8080");
+    // Ask for optional server URL for multi-laptop demo (default now 8082, can be overridden via system/env)
+    String defaultUrl = System.getProperty("campuscupid.server",
+        System.getenv().getOrDefault("CAMPUSCUPID_SERVER_URL", "http://localhost:8082"));
+    String url = JOptionPane.showInputDialog(this, "Server URL (leave blank for local DB):", defaultUrl);
         if (url != null && !url.trim().isEmpty()) {
             Database.setRemoteBaseUrl(url.trim());
         }
     // Initialize database schema (used by local mode and also safe on server)
     Database.init();
+        // Ensure there are enough demo users so swiping has content
+        Database.seedDemoUsers();
 
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
