@@ -37,12 +37,12 @@ public class MainWindow extends JFrame {
     private boolean profileCompleted = false;
 
     public MainWindow() {
-        setTitle("CampusCupid - Java Swing");
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        // Increase default size and set a minimum to fit redesigned screens
-        setSize(1000, 720);
-        setMinimumSize(new Dimension(1000, 750));
-        setLocationRelativeTo(null);
+    setTitle("CampusCupid - Java Swing");
+    setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+    // Increase default size and set a minimum to fit redesigned screens
+    setSize(1000, 1000);
+    setMinimumSize(new Dimension(1000, 950));
+    setLocationRelativeTo(null);
 
         // Improve Look & Feel (Nimbus) if available
         try {
